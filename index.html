@@ -346,32 +346,31 @@ tbody td:nth-child(2){text-align:right}
     if(e.ctrlKey && e.keyCode===83){ e.preventDefault(); return false; }
   });
 
-  // 4. إغلاق الصفحة عند فتح DevTools
-  var devtools = { open: false };
-  var threshold = 160;
+  // 4. كشف DevTools بطريقة أدق
+  var _devOpen = false;
   function detectDevTools(){
-    if(window.outerWidth - window.innerWidth > threshold ||
-       window.outerHeight - window.innerHeight > threshold){
-      if(!devtools.open){
-        devtools.open = true;
-        document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:Cairo,Arial;direction:rtl;background:#1a2332;color:#fff;flex-direction:column;gap:20px"><div style="font-size:60px">🔒</div><div style="font-size:22px;font-weight:900">غير مصرح بالوصول</div><div style="font-size:14px;opacity:.7">يُمنع فتح أدوات المطور في هذا النظام</div></div>';
+    var w = window.outerWidth - window.innerWidth;
+    var h = window.outerHeight - window.innerHeight;
+    // threshold أعلى لتجنب false positive
+    if(w > 300 || h > 300){
+      if(!_devOpen){
+        _devOpen = true;
+        // تحذير فقط بدون إغلاق
+        document.title = '🔒 غير مصرح';
       }
+    } else {
+      _devOpen = false;
+      document.title = document.title.replace('🔒 غير مصرح','');
     }
   }
-  setInterval(detectDevTools, 500);
+  setInterval(detectDevTools, 1000);
 
-  // 5. منع عرض Console
-  var _c = console;
-  Object.defineProperty(window, 'console', {
-    get: function(){
-      detectDevTools();
-      return { log:function(){}, warn:function(){}, error:function(){}, info:function(){}, debug:function(){} };
-    }
-  });
-
-  // 6. إخفاء رسائل Console
+  // 5. إخفاء رسائل Console
   try{
-    Object.defineProperty(console, '_commandLineAPI', { get: function(){ throw '🔒 محظور'; }});
+    var _noop = function(){};
+    console.log = _noop; console.warn = _noop;
+    console.error = _noop; console.info = _noop;
+    console.debug = _noop;
   }catch(e){}
 
   // 7. منع Drag
