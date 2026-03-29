@@ -73,6 +73,25 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 window._fbReady = true;
+
+// مراقبة lockRecording - تُشغَّل عند تحميل الصفحة
+window._checkLockBeforeLogin = function(){
+  try{
+    var db = firebase.firestore();
+    if(!db) return;
+    db.collection("rasid").doc("settings").get().then(function(snap){
+      if(!snap.exists) return;
+      var raw = snap.data();
+      var settings = (raw && raw.data) ? raw.data : raw;
+      if(settings && settings.lockRecording === true){
+        window._recordingLocked = true;
+      } else {
+        window._recordingLocked = false;
+      }
+    }).catch(function(){});
+  }catch(e){}
+};
+setTimeout(window._checkLockBeforeLogin, 2000);
 // تسجيل anonymous auth لضمان إذن الكتابة للمعلمين والإداريين
 setTimeout(function(){
   try{
@@ -732,6 +751,34 @@ async function doCreateAdmin(){
 }
 </script>
 
+<!-- MODAL: تغيير كلمة مرور الأدمن -->
+<div class="overlay" id="adminPwdOverlay">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-t">🔑 تغيير كلمة مرور المسؤول
+      <button class="modal-close" onclick="document.getElementById('adminPwdOverlay').classList.remove('on')">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+      <div>
+        <label class="lbl">كلمة المرور الحالية</label>
+        <input class="inp" id="apOld" type="password" placeholder="أدخل كلمة المرور الحالية">
+      </div>
+      <div>
+        <label class="lbl">كلمة المرور الجديدة</label>
+        <input class="inp" id="apNew" type="password" placeholder="6 أحرف على الأقل">
+      </div>
+      <div>
+        <label class="lbl">تأكيد كلمة المرور الجديدة</label>
+        <input class="inp" id="apConfirm" type="password" placeholder="أعد كتابة كلمة المرور الجديدة">
+      </div>
+      <div id="apErr" style="color:#dc2626;font-size:12px;min-height:18px"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn bgl sm" onclick="document.getElementById('adminPwdOverlay').classList.remove('on')">إلغاء</button>
+        <button class="btn bb sm" onclick="doChangeAdminPwd()">✅ تغيير كلمة المرور</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: تغيير كلمة المرور -->
 <div class="overlay" id="changePwdOverlay">
   <div class="modal" style="max-width:420px">
@@ -765,6 +812,58 @@ async function doCreateAdmin(){
 
 <script>
 let _cpIsStaff = false;
+
+function showAdminPwdModal(){
+  document.getElementById("apOld").value = "";
+  document.getElementById("apNew").value = "";
+  document.getElementById("apConfirm").value = "";
+  document.getElementById("apErr").textContent = "";
+  document.getElementById("adminPwdOverlay").classList.add("on");
+}
+
+async function doChangeAdminPwd(){
+  const errEl   = document.getElementById("apErr");
+  const oldPwd  = document.getElementById("apOld").value.trim();
+  const newPwd  = document.getElementById("apNew").value.trim();
+  const confirm = document.getElementById("apConfirm").value.trim();
+  errEl.textContent = "";
+
+  if(!oldPwd || !newPwd || !confirm){
+    errEl.textContent = "❌ يرجى ملء جميع الحقول"; return;
+  }
+  if(newPwd.length < 6){
+    errEl.textContent = "❌ كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل"; return;
+  }
+  if(newPwd !== confirm){
+    errEl.textContent = "❌ كلمة المرور الجديدة غير متطابقة"; return;
+  }
+
+  // تغيير عبر Firebase Authentication
+  const auth = _fbAuth();
+  if(auth && auth.currentUser){
+    try{
+      // إعادة المصادقة أولاً
+      const cred = firebase.auth.EmailAuthProvider.credential(
+        auth.currentUser.email, oldPwd
+      );
+      await auth.currentUser.reauthenticateWithCredential(cred);
+      // تغيير كلمة المرور
+      await auth.currentUser.updatePassword(newPwd);
+      document.getElementById("adminPwdOverlay").classList.remove("on");
+      toast("✅ تم تغيير كلمة مرور المسؤول بنجاح", "ok");
+    } catch(e){
+      if(e.code === "auth/wrong-password" || e.code === "auth/invalid-credential"){
+        errEl.textContent = "❌ كلمة المرور الحالية غير صحيحة";
+      } else if(e.code === "auth/weak-password"){
+        errEl.textContent = "❌ كلمة المرور ضعيفة جداً";
+      } else {
+        errEl.textContent = "❌ " + (e.message || "خطأ غير معروف");
+      }
+    }
+  } else {
+    errEl.textContent = "❌ يجب تسجيل الدخول أولاً";
+  }
+}
 
 function showChangePwdModal(isStaff){
   _cpIsStaff = isStaff;
@@ -1036,6 +1135,57 @@ async function refreshFromCloud(){
 </style>
 
 <script>
+// ===================== فحص إيقاف الرصد =====================
+function checkRecordingLocked(){
+  // فحص من الذاكرة المحلية أولاً ثم من Firebase
+  if(window._recordingLocked === true) return true;
+  if(typeof getLockRecording === "function" && getLockRecording()) return true;
+  return false;
+}
+
+// wrapper للـ TL و SL للفحص قبل الدخول
+function _wrapLoginWithLockCheck(originalFn, role){
+  return function(){
+    // نقرأ من Firebase مباشرة للتأكد
+    var db = typeof _fbDB === "function" ? _fbDB() : null;
+    if(db){
+      db.collection("rasid").doc("settings").get().then(function(snap){
+        var locked = false;
+        if(snap.exists){
+          var raw = snap.data();
+          var s = (raw && raw.data) ? raw.data : raw;
+          locked = s && s.lockRecording === true;
+        }
+        if(locked){
+          var errId = role === "teacher" ? "tErr" : "sErr";
+          var errEl = document.getElementById(errId);
+          if(errEl) errEl.textContent = "🔴 الرصد موقوف حالياً من قِبَل الإدارة";
+        } else {
+          originalFn.apply(this, arguments);
+        }
+      }).catch(function(){
+        originalFn.apply(this, arguments);
+      });
+    } else {
+      if(checkRecordingLocked()){
+        var errId2 = role === "teacher" ? "tErr" : "sErr";
+        var errEl2 = document.getElementById(errId2);
+        if(errEl2) errEl2.textContent = "🔴 الرصد موقوف حالياً من قِبَل الإدارة";
+      } else {
+        originalFn.apply(this, arguments);
+      }
+    }
+  };
+}
+
+// تطبيق الـ wrapper بعد تحميل الصفحة
+document.addEventListener("DOMContentLoaded", function(){
+  setTimeout(function(){
+    if(typeof TL === "function") window.TL = _wrapLoginWithLockCheck(TL, "teacher");
+    if(typeof SL === "function") window.SL = _wrapLoginWithLockCheck(SL, "staff");
+  }, 3000);
+});
+
 // ===================== ROLE GATEWAY =====================
 
 function goToRoleGateway(){
@@ -1158,6 +1308,18 @@ function injectAdminExtras(){
   wrap.style.cssText = "display:flex;flex-direction:column;gap:12px;padding:0 0 8px 0";
 
   wrap.innerHTML = `
+    <!-- زر إيقاف/تفعيل الرصد -->
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;background:#fff3f3;border:2px solid #dc262633;border-radius:10px">
+      <button id="lockRecordingBtn"
+        onclick="toggleLockRecording()"
+        style="padding:10px 18px;border-radius:10px;border:2px solid;font-weight:700;font-size:13px;cursor:pointer;transition:all .2s;min-width:280px">
+        ...
+      </button>
+      <span style="font-size:11px;color:var(--text-s);flex:1;min-width:180px">
+        ⚠️ عند الإيقاف لا يستطيع أي معلم أو إداري الدخول للرصد.
+        استخدمه عند اكتمال الرصد أو في حالات الطوارئ.
+      </span>
+    </div>
     <!-- زر تفعيل بوابة ولي الأمر -->
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <button id="parentToggleBtn"
@@ -1174,10 +1336,60 @@ function injectAdminExtras(){
     <div id="dupWarningBox"></div>
   `;
 
+  // زر تغيير كلمة مرور الأدمن
+  const adminPwdBtn = document.createElement("div");
+  adminPwdBtn.style.cssText = "margin-bottom:10px";
+  adminPwdBtn.innerHTML = "<button class='btn sm' style='background:linear-gradient(135deg,#1a3a6b,#2d5aa0);color:#fff;gap:6px' onclick='showAdminPwdModal()'>🔑 تغيير كلمة مرور المسؤول</button>";
+
   // إدراجه في أول adminContent
   ac.insertBefore(wrap, ac.firstChild);
   updateParentToggleBtn();
+  updateLockRecordingBtn();
   renderDuplicateWarnings();
+}
+
+// ===================== إيقاف الرصد =====================
+
+function getLockRecording(){
+  if(!DB || !DB.settings) return false;
+  const s = DB.settings;
+  const val = s.lockRecording !== undefined ? s.lockRecording
+    : (s.data && s.data.lockRecording !== undefined ? s.data.lockRecording : false);
+  return val === true;
+}
+
+function toggleLockRecording(){
+  if(!DB.settings) DB.settings = {};
+  const current = DB.settings.lockRecording === true;
+  const next    = !current;
+  DB.settings.lockRecording = next;
+
+  try{ localStorage.setItem("r3_settings", JSON.stringify(DB.settings)); }catch(e){}
+  updateLockRecordingBtn();
+  toast(next ? "🔴 تم إيقاف الرصد لجميع الفئات" : "🟢 تم تفعيل الرصد لجميع الفئات", next ? "warn" : "ok");
+
+  const db = _fbDB();
+  if(db){
+    setSyncSaving();
+    const settingsToSave = Object.assign({}, DB.settings, { lockRecording: next });
+    DB.settings = settingsToSave;
+    db.collection("rasid").doc("settings")
+      .set({ data: settingsToSave })
+      .then(()=>{ setSyncOk(); })
+      .catch((err)=>{ setSyncErr(); console.error("toggleLock error:", err); });
+  }
+}
+
+function updateLockRecordingBtn(){
+  const btn = document.getElementById("lockRecordingBtn");
+  if(!btn) return;
+  const locked = getLockRecording();
+  btn.innerHTML = locked
+    ? "🟢 الرصد موقوف — اضغط لتفعيله"
+    : "🔴 إيقاف الرصد — منع دخول المعلمين والإداريين";
+  btn.style.background    = locked ? "#dcfce7" : "#fef2f2";
+  btn.style.color         = locked ? "#16a34a" : "#dc2626";
+  btn.style.borderColor   = locked ? "#16a34a" : "#dc2626";
 }
 
 // ===================== PARENT PORTAL =====================
@@ -1291,6 +1503,7 @@ function toggleParentEnabled(){
 }
 
 function updateParentToggleBtn(){
+  updateLockRecordingBtn();
   const btn = document.getElementById("parentToggleBtn");
   if(!btn) return;
   const on = getParentEnabled();
