@@ -1309,19 +1309,18 @@ function injectAdminExtras(){
 
   wrap.innerHTML = `
     <!-- زر إيقاف/تفعيل الرصد -->
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;background:#fff3f3;border:2px solid #dc262633;border-radius:10px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;background:#fff3f3;border:2px solid #dc262633;border-radius:10px;margin-bottom:4px">
       <button id="lockRecordingBtn"
         onclick="toggleLockRecording()"
         style="padding:10px 18px;border-radius:10px;border:2px solid;font-weight:700;font-size:13px;cursor:pointer;transition:all .2s;min-width:280px">
-        ...
+        🔴 إيقاف الرصد — منع دخول المعلمين والإداريين
       </button>
       <span style="font-size:11px;color:var(--text-s);flex:1;min-width:180px">
         ⚠️ عند الإيقاف لا يستطيع أي معلم أو إداري الدخول للرصد.
-        استخدمه عند اكتمال الرصد أو في حالات الطوارئ.
       </span>
     </div>
     <!-- زر تفعيل بوابة ولي الأمر -->
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px">
       <button id="parentToggleBtn"
         onclick="toggleParentEnabled()"
         style="padding:10px 18px;border-radius:10px;border:2px solid;font-weight:700;font-size:13px;cursor:pointer;transition:all .2s;min-width:280px">
@@ -1329,19 +1328,21 @@ function injectAdminExtras(){
       </button>
       <span style="font-size:11px;color:var(--text-s);flex:1;min-width:180px">
         💡 عند التفعيل يستطيع أولياء الأمور رؤية تقارير أبنائهم.
-        عند التعطيل تظهر لهم رسالة "لا توجد بيانات حالية".
       </span>
+    </div>
+    <!-- زر تغيير كلمة المرور -->
+    <div style="margin-bottom:4px">
+      <button class="btn sm"
+        style="background:linear-gradient(135deg,#1a3a6b,#2d5aa0);color:#fff"
+        onclick="showAdminPwdModal()">
+        🔑 تغيير كلمة مرور المسؤول
+      </button>
     </div>
     <!-- صندوق تحذيرات التكرار -->
     <div id="dupWarningBox"></div>
   `;
 
-  // زر تغيير كلمة مرور الأدمن
-  const adminPwdBtn = document.createElement("div");
-  adminPwdBtn.style.cssText = "margin-bottom:10px";
-  adminPwdBtn.innerHTML = "<button class='btn sm' style='background:linear-gradient(135deg,#1a3a6b,#2d5aa0);color:#fff;gap:6px' onclick='showAdminPwdModal()'>🔑 تغيير كلمة مرور المسؤول</button>";
-
-  // إدراجه في أول adminContent
+  // إدراج في adminContent
   ac.insertBefore(wrap, ac.firstChild);
   updateParentToggleBtn();
   updateLockRecordingBtn();
@@ -1358,11 +1359,26 @@ function getLockRecording(){
   return val === true;
 }
 
-function toggleLockRecording(){
+async function toggleLockRecording(){
   if(!DB.settings) DB.settings = {};
-  const current = DB.settings.lockRecording === true;
-  const next    = !current;
+
+  // قراءة القيمة الحالية من Firebase أولاً
+  let current = DB.settings.lockRecording === true;
+  try{
+    const db2 = _fbDB();
+    if(db2){
+      const snap = await db2.collection("rasid").doc("settings").get();
+      if(snap.exists){
+        const raw = snap.data();
+        const s2 = (raw && raw.data) ? raw.data : raw;
+        if(s2 && s2.lockRecording !== undefined) current = s2.lockRecording === true;
+      }
+    }
+  }catch(e){}
+
+  const next = !current;
   DB.settings.lockRecording = next;
+  window._recordingLocked = next;
 
   try{ localStorage.setItem("r3_settings", JSON.stringify(DB.settings)); }catch(e){}
   updateLockRecordingBtn();
@@ -1376,7 +1392,7 @@ function toggleLockRecording(){
     db.collection("rasid").doc("settings")
       .set({ data: settingsToSave })
       .then(()=>{ setSyncOk(); })
-      .catch((err)=>{ setSyncErr(); console.error("toggleLock error:", err); });
+      .catch((err)=>{ setSyncErr(); });
   }
 }
 
