@@ -759,6 +759,10 @@ async function doCreateAdmin(){
     </div>
     <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
       <div>
+        <label class="lbl">البريد الإلكتروني للمسؤول</label>
+        <input class="inp" id="apEmail" type="email" placeholder="admin@example.com" dir="ltr">
+      </div>
+      <div>
         <label class="lbl">كلمة المرور الحالية</label>
         <input class="inp" id="apOld" type="password" placeholder="أدخل كلمة المرور الحالية">
       </div>
@@ -814,6 +818,16 @@ async function doCreateAdmin(){
 let _cpIsStaff = false;
 
 function showAdminPwdModal(){
+  const auth = _fbAuth();
+  const emailField = document.getElementById("apEmail");
+  // تعبئة البريد تلقائياً إذا كان المسؤول مسجلاً
+  if(emailField){
+    if(auth && auth.currentUser && auth.currentUser.email){
+      emailField.value = auth.currentUser.email;
+    } else {
+      emailField.value = "";
+    }
+  }
   document.getElementById("apOld").value = "";
   document.getElementById("apNew").value = "";
   document.getElementById("apConfirm").value = "";
@@ -838,30 +852,32 @@ async function doChangeAdminPwd(){
     errEl.textContent = "❌ كلمة المرور الجديدة غير متطابقة"; return;
   }
 
+  const email = document.getElementById("apEmail") ? document.getElementById("apEmail").value.trim() : "";
+  if(!email){ errEl.textContent = "❌ يرجى إدخال البريد الإلكتروني"; return; }
+
   // تغيير عبر Firebase Authentication
   const auth = _fbAuth();
-  if(auth && auth.currentUser){
-    try{
-      // إعادة المصادقة أولاً
-      const cred = firebase.auth.EmailAuthProvider.credential(
-        auth.currentUser.email, oldPwd
-      );
-      await auth.currentUser.reauthenticateWithCredential(cred);
-      // تغيير كلمة المرور
-      await auth.currentUser.updatePassword(newPwd);
-      document.getElementById("adminPwdOverlay").classList.remove("on");
-      toast("✅ تم تغيير كلمة مرور المسؤول بنجاح", "ok");
-    } catch(e){
-      if(e.code === "auth/wrong-password" || e.code === "auth/invalid-credential"){
-        errEl.textContent = "❌ كلمة المرور الحالية غير صحيحة";
-      } else if(e.code === "auth/weak-password"){
-        errEl.textContent = "❌ كلمة المرور ضعيفة جداً";
-      } else {
-        errEl.textContent = "❌ " + (e.message || "خطأ غير معروف");
-      }
+  if(!auth){ errEl.textContent = "❌ Firebase غير متصل"; return; }
+
+  try{
+    // تسجيل دخول مؤقت للتحقق ثم التغيير
+    const userCred = await auth.signInWithEmailAndPassword(email, oldPwd);
+    // تغيير كلمة المرور
+    await userCred.user.updatePassword(newPwd);
+    document.getElementById("adminPwdOverlay").classList.remove("on");
+    toast("✅ تم تغيير كلمة مرور المسؤول بنجاح", "ok");
+  } catch(e){
+    if(e.code === "auth/wrong-password" || e.code === "auth/invalid-credential"){
+      errEl.textContent = "❌ البريد أو كلمة المرور الحالية غير صحيحة";
+    } else if(e.code === "auth/user-not-found"){
+      errEl.textContent = "❌ البريد الإلكتروني غير موجود";
+    } else if(e.code === "auth/weak-password"){
+      errEl.textContent = "❌ كلمة المرور الجديدة ضعيفة جداً";
+    } else if(e.code === "auth/invalid-email"){
+      errEl.textContent = "❌ البريد الإلكتروني غير صحيح";
+    } else {
+      errEl.textContent = "❌ " + (e.message || "خطأ غير معروف");
     }
-  } else {
-    errEl.textContent = "❌ يجب تسجيل الدخول أولاً";
   }
 }
 
