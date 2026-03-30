@@ -74,6 +74,23 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 window._fbReady = true;
 
+// مراقبة حالة Auth لضمان الحفظ
+firebase.auth().onAuthStateChanged(function(user){
+  if(user){
+    window._authReady = true;
+    console.log("✅ Auth state: signed in", user.isAnonymous ? "(anonymous)" : "(email)");
+    // إذا كان هناك حفظ معلّق → نعيد المحاولة
+    if(window._pendingSave){
+      window._pendingSave = false;
+      try{ if(typeof saveREC === "function") saveREC(); }catch(e){}
+    }
+  } else {
+    window._authReady = false;
+    // تسجيل تلقائي
+    firebase.auth().signInAnonymously().catch(function(){});
+  }
+});
+
 // مراقبة lockRecording - تُشغَّل عند تحميل الصفحة
 window._checkLockBeforeLogin = function(){
   try{
@@ -93,16 +110,30 @@ window._checkLockBeforeLogin = function(){
 };
 setTimeout(window._checkLockBeforeLogin, 2000);
 // تسجيل anonymous auth لضمان إذن الكتابة للمعلمين والإداريين
-setTimeout(function(){
+// تسجيل anonymous فوراً عند تحميل Firebase
+(function tryAnonAuth(attempts){
   try{
     var _a = firebase.auth();
-    if(_a && !_a.currentUser){
-      _a.signInAnonymously().catch(function(e){
-        console.warn("anon auth:", e.code);
-      });
+    if(_a){
+      if(!_a.currentUser){
+        _a.signInAnonymously().then(function(){
+          window._authReady = true;
+          console.log("✅ Anonymous auth ready");
+        }).catch(function(e){
+          console.warn("anon auth error:", e.code);
+          // إعادة المحاولة بعد ثانية
+          if(attempts < 5) setTimeout(function(){ tryAnonAuth(attempts+1); }, 1000);
+        });
+      } else {
+        window._authReady = true;
+      }
+    } else {
+      if(attempts < 10) setTimeout(function(){ tryAnonAuth(attempts+1); }, 500);
     }
-  }catch(e){}
-}, 1500);
+  }catch(e){
+    if(attempts < 10) setTimeout(function(){ tryAnonAuth(attempts+1); }, 500);
+  }
+})(0);
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -342,6 +373,21 @@ tbody td:nth-child(2){text-align:right}
 </head>
 <body>
 <script>
+// ========== ضمان Auth قبل الحفظ ==========
+async function ensureAuthBeforeSave(){
+  try{
+    var auth = firebase.auth();
+    if(!auth) return false;
+    if(auth.currentUser) return true;
+    // ننتظر حتى يكتمل الـ auth
+    await auth.signInAnonymously();
+    return true;
+  }catch(e){
+    console.warn("ensureAuth failed:", e.code);
+    return false;
+  }
+}
+
 // ========== تدرج لوني تلقائي ==========
 document.addEventListener("input", function(e){
   var el = e.target;
