@@ -549,7 +549,7 @@ document.addEventListener("DOMContentLoaded", function(){
       <span style="font-weight:800;color:var(--blue);font-size:14px">👨‍🏫 تسجيل دخول المعلم</span>
       <input type="text" id="tU" placeholder="اسم المستخدم" onkeydown="if(event.key==='Enter')TL()">
       <input type="password" id="tP" placeholder="كلمة المرور" onkeydown="if(event.key==='Enter')TL()">
-      <button class="btn bb" onclick="TL()">🔑 دخول المعلم</button>
+      <button class="btn bb" onclick="if(checkRecordingLocked()){document.getElementById('tErr').textContent='🔴 الرصد موقوف من قِبَل الإدارة';}else{TL();}">🔑 دخول المعلم</button>
       <button class="btn sm" style="background:rgba(29,111,164,.15);color:var(--blue);border:1.5px solid #1d6fa433" onclick="refreshFromCloud()" title="جلب أحدث البيانات من Firebase">🔄 تحديث البيانات</button>
       <span class="lerr" id="tErr"></span>
     </div>
@@ -588,7 +588,7 @@ document.addEventListener("DOMContentLoaded", function(){
       <span style="font-weight:800;color:var(--purple);font-size:14px">🛡️ تسجيل دخول الإداري</span>
       <input type="text" id="sU" placeholder="اسم المستخدم" onkeydown="if(event.key==='Enter')SL()">
       <input type="password" id="sP" placeholder="كلمة المرور" onkeydown="if(event.key==='Enter')SL()">
-      <button class="btn bp" onclick="SL()">🔑 دخول إداري</button>
+      <button class="btn bp" onclick="if(checkRecordingLocked()){document.getElementById('sErr').textContent='🔴 الرصد موقوف من قِبَل الإدارة';}else{SL();}">🔑 دخول إداري</button>
       <button class="btn sm" style="background:rgba(107,63,160,.15);color:var(--purple);border:1.5px solid #6b3fa033" onclick="refreshFromCloud()" title="جلب أحدث البيانات من Firebase">🔄 تحديث البيانات</button>
       <span class="lerr" id="sErr"></span>
     </div>
@@ -1141,39 +1141,12 @@ async function refreshFromCloud(){
 <script>
 // ===================== فحص إيقاف الرصد =====================
 function checkRecordingLocked(){
-  // فحص من الذاكرة المحلية أولاً ثم من Firebase
   if(window._recordingLocked === true) return true;
-  if(typeof getLockRecording === "function" && getLockRecording()) return true;
+  try{
+    if(DB && DB.settings && DB.settings.lockRecording === true) return true;
+  }catch(e){}
   return false;
 }
-
-// wrapper للـ TL و SL للفحص قبل الدخول
-function _wrapLoginWithLockCheck(originalFn, role){
-  return function(){
-    // فحص محلي سريع من DB.settings
-    var locked = false;
-    try{
-      if(DB && DB.settings && DB.settings.lockRecording === true) locked = true;
-      else if(window._recordingLocked === true) locked = true;
-    }catch(e){}
-
-    if(locked){
-      var errId = role === "teacher" ? "tErr" : "sErr";
-      var errEl = document.getElementById(errId);
-      if(errEl) errEl.textContent = "🔴 الرصد موقوف حالياً من قِبَل الإدارة";
-    } else {
-      originalFn.apply(this, arguments);
-    }
-  };
-}
-
-// تطبيق الـ wrapper بعد تحميل الصفحة
-document.addEventListener("DOMContentLoaded", function(){
-  setTimeout(function(){
-    if(typeof TL === "function") window.TL = _wrapLoginWithLockCheck(TL, "teacher");
-    if(typeof SL === "function") window.SL = _wrapLoginWithLockCheck(SL, "staff");
-  }, 3000);
-});
 
 // ===================== تدرج لوني للدرجات =====================
 
