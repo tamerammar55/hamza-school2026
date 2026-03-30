@@ -74,6 +74,27 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 window._fbReady = true;
 
+// ===== تسجيل Anonymous Auth فوراً =====
+(function initAuth(){
+  try{
+    var auth = firebase.auth();
+    if(auth.currentUser){
+      window._authReady = true;
+      return;
+    }
+    auth.onAuthStateChanged(function(user){
+      if(user){
+        window._authReady = true;
+        console.log("✅ Auth ready:", user.isAnonymous ? "anonymous" : "email");
+      } else {
+        auth.signInAnonymously()
+          .then(function(){ window._authReady = true; })
+          .catch(function(e){ console.warn("anon auth:", e.code); });
+      }
+    });
+  }catch(e){ console.error("initAuth:", e); }
+})();
+
 // مراقبة lockRecording - تُشغَّل عند تحميل الصفحة
 window._checkLockBeforeLogin = function(){
   try{
@@ -217,8 +238,9 @@ tbody td{padding:9px 11px;border-bottom:1px solid var(--border);text-align:cente
 tbody td:nth-child(2){text-align:right}
 .cid{color:var(--text-s);font-weight:600;font-size:11px}
 .cname{font-weight:700;color:var(--text)}
-.sinp{width:68px;padding:5px 7px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-family:var(--font);text-align:center;outline:none;transition:border .2s}
+.sinp{width:68px;padding:5px 7px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-family:var(--font);text-align:center;outline:none;transition:background .2s,border-color .2s,color .2s}
 .sinp:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(29,111,164,.1)}
+.ssel{transition:background .2s,color .2s}
 .ssel{padding:5px 9px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-family:var(--font);outline:none;background:#fff;cursor:pointer}
 .ssel:focus{border-color:var(--blue)}
 .tinp{width:120px;padding:5px 7px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-family:var(--font);text-align:right;outline:none}
@@ -341,6 +363,37 @@ tbody td:nth-child(2){text-align:right}
 </head>
 <body>
 <script>
+// ========== تدرج لوني تلقائي ==========
+document.addEventListener("input", function(e){
+  var el = e.target;
+  if(el.classList.contains("sinp")){
+    var max = el.getAttribute("data-max") || el.getAttribute("max") || 0;
+    if(typeof applyScoreColor === "function") applyScoreColor(el, max);
+  }
+  if(el.classList.contains("ssel")){
+    if(typeof applySelectColor === "function") applySelectColor(el);
+  }
+});
+document.addEventListener("change", function(e){
+  var el = e.target;
+  if(el.classList.contains("ssel")){
+    if(typeof applySelectColor === "function") applySelectColor(el);
+  }
+});
+
+// تطبيق الألوان عند تحميل الجدول (MutationObserver)
+var _colorObserver = new MutationObserver(function(){
+  if(typeof applyAllScoreColors === "function") applyAllScoreColors();
+});
+document.addEventListener("DOMContentLoaded", function(){
+  var panels = document.getElementById("p1") || document.getElementById("p2");
+  if(panels) _colorObserver.observe(document.body, {childList:true, subtree:true});
+  // تطبيق أولي بعد ثانية
+  setTimeout(function(){
+    if(typeof applyAllScoreColors === "function") applyAllScoreColors();
+  }, 1500);
+});
+
 // ========== حماية المشروع ==========
 (function(){
 
@@ -845,10 +898,41 @@ async function refreshFromCloud(){
   toast("⏳ جاري جلب البيانات من السحابة...","");
   setSyncSaving();
 
-  // تحميل من Firebase — يُحدِّث DB و REC مباشرة
-  await loadAllFromFB();
+  // حفظ REC الحالي قبل أي شيء
+  var _savedREC = {};
+  try{ _savedREC = JSON.parse(JSON.stringify(REC)); }catch(e){ _savedREC = REC; }
 
-  // إعادة تشغيل المستمعات لضمان الاتصال
+  // تحميل DB فقط من Firebase (بدون المساس بـ REC)
+  const _db2 = _fbDB();
+  if(_db2){
+    try{
+      const snap2 = await _db2.collection("rasid").get();
+      snap2.forEach(doc => {
+        const data = doc.data()?.data;
+        if(data === undefined || data === null) return;
+        const id = doc.id;
+        if(id === "students")       DB.students       = data;
+        else if(id === "teachers")  DB.teachers       = data;
+        else if(id === "staff")     DB.staff          = data;
+        else if(id === "settings")  DB.settings       = data;
+        else if(id === "teacher_items") DB.teacher_items = data;
+        else if(id === "admin_items")   DB.admin_items   = data;
+        else if(id === "physical_items") DB.physical_items = data;
+        else if(id === "records"){
+          // دمج: نضيف فقط ما ليس موجوداً محلياً
+          Object.keys(data).forEach(k => {
+            if(!_savedREC[k]) _savedREC[k] = data[k];
+          });
+        }
+      });
+    }catch(e){ console.error("refresh error:", e); }
+  }
+
+  // استعادة REC المحمي
+  REC = _savedREC;
+  try{ localStorage.setItem("r3_records", JSON.stringify(REC)); }catch(e){}
+
+  // إعادة تشغيل المستمعات
   startRecordsListener();
   startSettingsListener();
 
@@ -1105,6 +1189,88 @@ document.addEventListener("DOMContentLoaded", function(){
     if(typeof SL === "function") window.SL = _wrapLoginWithLockCheck(SL, "staff");
   }, 3000);
 });
+
+// ===================== تدرج لوني للدرجات =====================
+
+// تحديد اللون بناءً على النسبة من النهاية العظمى
+function getScoreColor(val, max){
+  if(val === "" || val === null || isNaN(val) || max <= 0) return null;
+  const pct = (parseFloat(val) / parseFloat(max)) * 100;
+  if(pct >= 90) return { bg:"#dcfce7", border:"#16a34a", text:"#15803d" }; // أخضر غامق - ممتاز
+  if(pct >= 75) return { bg:"#d1fae5", border:"#059669", text:"#047857" }; // أخضر - جيد جداً
+  if(pct >= 60) return { bg:"#fef9c3", border:"#ca8a04", text:"#a16207" }; // أصفر - جيد
+  if(pct >= 45) return { bg:"#ffedd5", border:"#ea580c", text:"#c2410c" }; // برتقالي - مقبول
+  return { bg:"#fee2e2", border:"#dc2626", text:"#b91c1c" };               // أحمر - ضعيف
+}
+
+// تطبيق اللون على input الدرجة
+function applyScoreColor(inp, max){
+  if(!inp) return;
+  var val = inp.value;
+  var col = getScoreColor(val, max);
+  if(col){
+    inp.style.background    = col.bg;
+    inp.style.borderColor   = col.border;
+    inp.style.color         = col.text;
+    inp.style.fontWeight    = "800";
+  } else {
+    inp.style.background  = "";
+    inp.style.borderColor = "";
+    inp.style.color       = "";
+    inp.style.fontWeight  = "";
+  }
+}
+
+// تطبيق ألوان القائمة (select)
+function applySelectColor(sel){
+  if(!sel) return;
+  var opts = sel.options;
+  var total = opts.length;
+  // ألوان مخصصة للخيارات
+  var colors = [
+    { bg:"#dcfce7", color:"#15803d" }, // الأول - أخضر (ممتاز)
+    { bg:"#d1fae5", color:"#047857" }, // الثاني - أخضر فاتح (جيد جداً)
+    { bg:"#fef9c3", color:"#a16207" }, // الثالث - أصفر (جيد)
+    { bg:"#ffedd5", color:"#c2410c" }, // الرابع - برتقالي (مقبول)
+    { bg:"#fee2e2", color:"#b91c1c" }, // آخر - أحمر (ضعيف)
+  ];
+  // تطبيق اللون على الـ select نفسه بناءً على القيمة المختارة
+  var idx = sel.selectedIndex;
+  if(idx > 0 && idx <= total - 1){
+    // إذا كان الخيار الأخير → أحمر
+    if(idx === total - 1){
+      sel.style.background  = "#fee2e2";
+      sel.style.borderColor = "#dc2626";
+      sel.style.color       = "#b91c1c";
+      sel.style.fontWeight  = "800";
+    } else {
+      // خيارات أخرى → ألوان تدريجية
+      var colIdx = Math.min(idx - 1, colors.length - 2);
+      var c = colors[colIdx];
+      sel.style.background  = c.bg;
+      sel.style.borderColor = "";
+      sel.style.color       = c.color;
+      sel.style.fontWeight  = "700";
+    }
+  } else {
+    sel.style.background  = "";
+    sel.style.borderColor = "";
+    sel.style.color       = "";
+    sel.style.fontWeight  = "";
+  }
+}
+
+// تطبيق الألوان على جميع inputs وselects في الجدول
+function applyAllScoreColors(){
+  // الدرجات الرقمية
+  document.querySelectorAll(".sinp[data-max]").forEach(function(inp){
+    applyScoreColor(inp, inp.getAttribute("data-max"));
+  });
+  // القوائم
+  document.querySelectorAll(".ssel").forEach(function(sel){
+    applySelectColor(sel);
+  });
+}
 
 // ===================== ROLE GATEWAY =====================
 
@@ -1826,84 +1992,7 @@ function exportStudentPDF(){
     + '.cert-actions{display:none!important;}'
     + '</style></head><body>'
     + certHTML
-    + '
-<!-- ================== FIREBASE SYNC FIX (UPDATED) ================== -->
-<script>
-async function saveREC() {
-  const db = firebase.firestore();
-  if (!db) return;
-
-  try {
-    const batch = db.batch();
-
-    Object.keys(REC).forEach(key => {
-      const ref = db.collection("rasid").doc("rec_" + key);
-      batch.set(ref, {
-        data: REC[key],
-        updatedAt: Date.now()
-      });
-    });
-
-    await batch.commit();
-    localStorage.setItem('r3_records', JSON.stringify(REC));
-    console.log("✅ تم الحفظ بنجاح");
-
-  } catch (e) {
-    console.error("❌ خطأ في الحفظ:", e);
-  }
-}
-
-async function loadAllFromFB() {
-  const db = firebase.firestore();
-  if (!db) return;
-
-  const snapshot = await db.collection("rasid").get();
-  REC = {};
-
-  snapshot.forEach(doc => {
-    if (doc.id.startsWith("rec_")) {
-      const key = doc.id.replace("rec_", "");
-      REC[key] = doc.data().data || {};
-    }
-  });
-
-  localStorage.setItem('r3_records', JSON.stringify(REC));
-  console.log("📥 تم تحميل البيانات");
-}
-
-function startRecordsListener() {
-  const db = firebase.firestore();
-  if (!db) return;
-
-  db.collection("rasid").onSnapshot(snapshot => {
-    let updated = false;
-
-    snapshot.forEach(doc => {
-      if (doc.id.startsWith("rec_")) {
-        const key = doc.id.replace("rec_", "");
-        const newData = doc.data().data || {};
-
-        if (JSON.stringify(REC[key]) !== JSON.stringify(newData)) {
-          REC[key] = newData;
-          updated = true;
-        }
-      }
-    });
-
-    if (updated) {
-      localStorage.setItem('r3_records', JSON.stringify(REC));
-      console.log("🔄 تحديث لحظي");
-    }
-  });
-}
-
-setTimeout(async () => {
-  await loadAllFromFB();
-  startRecordsListener();
-}, 2000);
-</script>
-
-</body></html>';
+    + '</body></html>';
 
   // إنشاء iframe مخفي وطباعة منه
   let iframe = document.getElementById("_printFrame");
@@ -1925,83 +2014,9 @@ setTimeout(async () => {
     iframe.contentWindow.print();
   }, 800);
 }
-</script>
 
 
-<!-- ================== FIREBASE SYNC FIX (UPDATED) ================== -->
-<script>
-async function saveREC() {
-  const db = firebase.firestore();
-  if (!db) return;
 
-  try {
-    const batch = db.batch();
-
-    Object.keys(REC).forEach(key => {
-      const ref = db.collection("rasid").doc("rec_" + key);
-      batch.set(ref, {
-        data: REC[key],
-        updatedAt: Date.now()
-      });
-    });
-
-    await batch.commit();
-    localStorage.setItem('r3_records', JSON.stringify(REC));
-    console.log("✅ تم الحفظ بنجاح");
-
-  } catch (e) {
-    console.error("❌ خطأ في الحفظ:", e);
-  }
-}
-
-async function loadAllFromFB() {
-  const db = firebase.firestore();
-  if (!db) return;
-
-  const snapshot = await db.collection("rasid").get();
-  REC = {};
-
-  snapshot.forEach(doc => {
-    if (doc.id.startsWith("rec_")) {
-      const key = doc.id.replace("rec_", "");
-      REC[key] = doc.data().data || {};
-    }
-  });
-
-  localStorage.setItem('r3_records', JSON.stringify(REC));
-  console.log("📥 تم تحميل البيانات");
-}
-
-function startRecordsListener() {
-  const db = firebase.firestore();
-  if (!db) return;
-
-  db.collection("rasid").onSnapshot(snapshot => {
-    let updated = false;
-
-    snapshot.forEach(doc => {
-      if (doc.id.startsWith("rec_")) {
-        const key = doc.id.replace("rec_", "");
-        const newData = doc.data().data || {};
-
-        if (JSON.stringify(REC[key]) !== JSON.stringify(newData)) {
-          REC[key] = newData;
-          updated = true;
-        }
-      }
-    });
-
-    if (updated) {
-      localStorage.setItem('r3_records', JSON.stringify(REC));
-      console.log("🔄 تحديث لحظي");
-    }
-  });
-}
-
-setTimeout(async () => {
-  await loadAllFromFB();
-  startRecordsListener();
-}, 2000);
 </script>
 
 </body>
