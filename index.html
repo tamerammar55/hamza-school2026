@@ -877,8 +877,23 @@ async function refreshFromCloud(){
   toast("⏳ جاري جلب البيانات من السحابة...","");
   setSyncSaving();
 
-  // تحميل من Firebase — يُحدِّث DB و REC مباشرة
+  // حفظ REC الحالي في الذاكرة قبل التحديث
+  var _currentREC = {};
+  try{ _currentREC = JSON.parse(JSON.stringify(REC)); }catch(e){ _currentREC = REC; }
+
+  // تحميل من Firebase — يُحدِّث DB و REC
   await loadAllFromFB();
+
+  // دمج REC الحالي مع Firebase (الأحدث يفوز)
+  // نُبقي على البيانات المحلية إذا كانت أحدث
+  if(Object.keys(_currentREC).length > 0){
+    Object.keys(_currentREC).forEach(function(key){
+      if(!REC[key] || Object.keys(_currentREC[key]).length > Object.keys(REC[key]||{}).length){
+        REC[key] = _currentREC[key];
+      }
+    });
+    try{ localStorage.setItem("r3_records", JSON.stringify(REC)); }catch(e){}
+  }
 
   // إعادة تشغيل المستمعات لضمان الاتصال
   startRecordsListener();
@@ -1962,6 +1977,61 @@ function exportStudentPDF(){
     iframe.contentWindow.print();
   }, 800);
 }
+
+// ===== إصلاح autoFill + الحفظ =====
+(function(){
+  // ننتظر حتى يُحمَّل autoFill الأصلي
+  var _maxTries = 20;
+  function tryWrap(){
+    if(typeof autoFill !== "function"){
+      if(--_maxTries > 0) setTimeout(tryWrap, 500);
+      return;
+    }
+    var _origAutoFill = autoFill;
+    window.autoFill = function(isStaff){
+      // 1. نُشغّل autoFill الأصلي (يُحدّث REC في الذاكرة)
+      _origAutoFill.call(this, isStaff);
+
+      // 2. نحفظ نسخة من REC بعد التعبئة فوراً
+      var _snapshot = {};
+      try{ _snapshot = JSON.parse(JSON.stringify(REC)); }catch(e){ _snapshot = REC; }
+
+      // 3. نحفظ في Firebase مباشرة (بـ set بسيط بدون transaction)
+      var _db = typeof _fbDB === "function" ? _fbDB() : null;
+      if(_db){
+        if(typeof setSyncSaving === "function") setSyncSaving();
+        try{ localStorage.setItem("r3_records", JSON.stringify(_snapshot)); }catch(e){}
+
+        _db.collection("rasid").doc("records").set({ data: _snapshot })
+          .then(function(){
+            // الحفظ نجح - نُثبّت REC من النسخة المحفوظة
+            REC = _snapshot;
+            try{ localStorage.setItem("r3_records", JSON.stringify(REC)); }catch(e){}
+            if(typeof setSyncOk === "function") setSyncOk();
+
+            // نُعيد رسم الجدول من REC الصحيح بعد لحظة
+            setTimeout(function(){
+              try{
+                if(typeof renderTable === "function"){
+                  renderTable(isStaff === true || isStaff === "true");
+                }
+                if(typeof updateComp === "function"){
+                  updateComp(isStaff === true || isStaff === "true");
+                }
+              }catch(e){}
+            }, 500);
+          })
+          .catch(function(err){
+            console.error("autoFill save error:", err);
+            if(typeof setSyncErr === "function") setSyncErr();
+          });
+      }
+    };
+    console.log("✅ autoFill wrapped with safe save");
+  }
+  setTimeout(tryWrap, 3000);
+})();
+
 </script>
 
 </body>
