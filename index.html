@@ -74,6 +74,27 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 window._fbReady = true;
 
+// ===== تسجيل Anonymous Auth فوراً =====
+(function initAuth(){
+  try{
+    var auth = firebase.auth();
+    if(auth.currentUser){
+      window._authReady = true;
+      return;
+    }
+    auth.onAuthStateChanged(function(user){
+      if(user){
+        window._authReady = true;
+        console.log("✅ Auth ready:", user.isAnonymous ? "anonymous" : "email");
+      } else {
+        auth.signInAnonymously()
+          .then(function(){ window._authReady = true; })
+          .catch(function(e){ console.warn("anon auth:", e.code); });
+      }
+    });
+  }catch(e){ console.error("initAuth:", e); }
+})();
+
 // مراقبة lockRecording - تُشغَّل عند تحميل الصفحة
 window._checkLockBeforeLogin = function(){
   try{
@@ -877,10 +898,41 @@ async function refreshFromCloud(){
   toast("⏳ جاري جلب البيانات من السحابة...","");
   setSyncSaving();
 
-  // تحميل من Firebase — يُحدِّث DB و REC
-  await loadAllFromFB();
+  // حفظ REC الحالي قبل أي شيء
+  var _savedREC = {};
+  try{ _savedREC = JSON.parse(JSON.stringify(REC)); }catch(e){ _savedREC = REC; }
 
-  // إعادة تشغيل المستمعات لضمان الاتصال
+  // تحميل DB فقط من Firebase (بدون المساس بـ REC)
+  const _db2 = _fbDB();
+  if(_db2){
+    try{
+      const snap2 = await _db2.collection("rasid").get();
+      snap2.forEach(doc => {
+        const data = doc.data()?.data;
+        if(data === undefined || data === null) return;
+        const id = doc.id;
+        if(id === "students")       DB.students       = data;
+        else if(id === "teachers")  DB.teachers       = data;
+        else if(id === "staff")     DB.staff          = data;
+        else if(id === "settings")  DB.settings       = data;
+        else if(id === "teacher_items") DB.teacher_items = data;
+        else if(id === "admin_items")   DB.admin_items   = data;
+        else if(id === "physical_items") DB.physical_items = data;
+        else if(id === "records"){
+          // دمج: نضيف فقط ما ليس موجوداً محلياً
+          Object.keys(data).forEach(k => {
+            if(!_savedREC[k]) _savedREC[k] = data[k];
+          });
+        }
+      });
+    }catch(e){ console.error("refresh error:", e); }
+  }
+
+  // استعادة REC المحمي
+  REC = _savedREC;
+  try{ localStorage.setItem("r3_records", JSON.stringify(REC)); }catch(e){}
+
+  // إعادة تشغيل المستمعات
   startRecordsListener();
   startSettingsListener();
 
@@ -1986,13 +2038,15 @@ function exportStudentPDF(){
       // حفظ محلي فوري
       try{ localStorage.setItem("r3_records", JSON.stringify(_snap)); }catch(e){}
 
-      // حفظ في Firebase
+      // حفظ في Firebase مع ضمان Auth
       var _db = typeof _fbDB === "function" ? _fbDB() : null;
       if(!_db){ return; }
 
       if(typeof setSyncSaving === "function") setSyncSaving();
 
-      _db.collection("rasid").doc("records").set({ data: _snap })
+      // ننتظر Auth إذا لم يكن جاهزاً
+      function doSave(){
+        _db.collection("rasid").doc("records").set({ data: _snap })
         .then(function(){
           // ثبّت REC من النسخة
           REC = _snap;
@@ -2016,78 +2070,7 @@ function exportStudentPDF(){
   }
   setTimeout(tryWrapAutoFill, 3000);
 
-  // ===== 2: إصلاح refreshFromCloud - لا يمسّ REC =====
-  var _maxTries2 = 20;
-  function tryWrapRefresh(){
-    if(typeof refreshFromCloud !== "function"){
-      if(--_maxTries2 > 0) setTimeout(tryWrapRefresh, 500);
-      return;
-    }
 
-    window.refreshFromCloud = async function(){
-      if(typeof toast === "function") toast("⏳ جاري جلب البيانات من السحابة...","");
-      if(typeof setSyncSaving === "function") setSyncSaving();
-
-      // حفظ REC الحالي قبل أي تحديث
-      var _savedREC = {};
-      try{ _savedREC = JSON.parse(JSON.stringify(REC)); }catch(e){ _savedREC = REC; }
-
-      // تحديث DB فقط من Firebase (بدون المساس بـ REC)
-      var _db = typeof _fbDB === "function" ? _fbDB() : null;
-      if(_db){
-        try{
-          var snap = await _db.collection("rasid").get();
-          snap.forEach(function(doc){
-            var data = doc.data() && doc.data().data;
-            if(data === undefined || data === null) return;
-            var id = doc.id;
-            if(id === "records"){
-              // دمج فقط - لا استبدال كامل
-              Object.keys(data).forEach(function(k){
-                if(!_savedREC[k]){
-                  _savedREC[k] = data[k];
-                }
-              });
-            } else if(id === "students")  { DB.students  = data; }
-            else if(id === "teachers")  { DB.teachers  = data; }
-            else if(id === "staff")     { DB.staff     = data; }
-            else if(id === "settings")  { DB.settings  = data; }
-          });
-        }catch(e){ console.error("refresh error:", e); }
-      }
-
-      // استعادة REC المحمي
-      REC = _savedREC;
-      try{ localStorage.setItem("r3_records", JSON.stringify(REC)); }catch(e){}
-
-      // إعادة تشغيل المستمعات
-      if(typeof startRecordsListener  === "function") startRecordsListener();
-      if(typeof startSettingsListener === "function") startSettingsListener();
-
-      // تحديث الواجهة
-      if(typeof renderAdminPanel === "function") renderAdminPanel();
-      if(typeof renderFilesTab   === "function") renderFilesTab();
-
-      var el = document.getElementById("lastSync");
-      if(el) el.textContent = new Date().toLocaleTimeString("ar");
-
-      if(typeof ST_ !== "undefined"){
-        if(ST_.teacher && ST_.tClass){
-          if(typeof buildCBs    === "function") buildCBs(ST_.teacher.classes||[], "tCBts", false);
-          if(typeof renderTable === "function") renderTable(false);
-        }
-        if(ST_.staff && ST_.sClass){
-          if(typeof buildCBs    === "function") buildCBs(ST_.staff.classes||[], "sCBts", true);
-          if(typeof renderTable === "function") renderTable(true);
-        }
-      }
-
-      if(typeof setSyncOk === "function") setSyncOk();
-      if(typeof toast     === "function") toast("✅ تم تحديث البيانات من السحابة","ok");
-    };
-    console.log("✅ refreshFromCloud wrapped");
-  }
-  setTimeout(tryWrapRefresh, 3500);
 
 })();
 
