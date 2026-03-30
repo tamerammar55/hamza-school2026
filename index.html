@@ -2015,64 +2015,7 @@ function exportStudentPDF(){
   }, 800);
 }
 
-// ===== الحل الجذري لمشكلة الحفظ والتحديث =====
-(function(){
 
-  // ===== 1: إصلاح autoFill =====
-  var _maxTries = 20;
-  function tryWrapAutoFill(){
-    if(typeof autoFill !== "function"){
-      if(--_maxTries > 0) setTimeout(tryWrapAutoFill, 500);
-      return;
-    }
-    var _origAutoFill = autoFill;
-
-    window.autoFill = function(isStaff){
-      // تشغيل autoFill الأصلي
-      _origAutoFill.call(this, isStaff);
-
-      // أخذ نسخة ثابتة من REC
-      var _snap = {};
-      try{ _snap = JSON.parse(JSON.stringify(REC)); }catch(e){ _snap = REC; }
-
-      // حفظ محلي فوري
-      try{ localStorage.setItem("r3_records", JSON.stringify(_snap)); }catch(e){}
-
-      // حفظ في Firebase مع ضمان Auth
-      var _db = typeof _fbDB === "function" ? _fbDB() : null;
-      if(!_db){ return; }
-
-      if(typeof setSyncSaving === "function") setSyncSaving();
-
-      // ننتظر Auth إذا لم يكن جاهزاً
-      function doSave(){
-        _db.collection("rasid").doc("records").set({ data: _snap })
-        .then(function(){
-          // ثبّت REC من النسخة
-          REC = _snap;
-          try{ localStorage.setItem("r3_records", JSON.stringify(REC)); }catch(e){}
-          if(typeof setSyncOk === "function") setSyncOk();
-          // أعد رسم الجدول
-          setTimeout(function(){
-            try{
-              var _isStaff = (isStaff === true || isStaff === "true");
-              if(typeof renderTable === "function") renderTable(_isStaff);
-              if(typeof updateComp  === "function") updateComp(_isStaff);
-            }catch(e){}
-          }, 600);
-        })
-        .catch(function(err){
-          console.error("autoFill save:", err);
-          if(typeof setSyncErr === "function") setSyncErr();
-        });
-    };
-    console.log("✅ autoFill wrapped");
-  }
-  setTimeout(tryWrapAutoFill, 3000);
-
-
-
-})();
 
 </script>
 
