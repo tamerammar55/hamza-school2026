@@ -877,23 +877,8 @@ async function refreshFromCloud(){
   toast("⏳ جاري جلب البيانات من السحابة...","");
   setSyncSaving();
 
-  // حفظ REC الحالي في الذاكرة قبل التحديث
-  var _currentREC = {};
-  try{ _currentREC = JSON.parse(JSON.stringify(REC)); }catch(e){ _currentREC = REC; }
-
   // تحميل من Firebase — يُحدِّث DB و REC
   await loadAllFromFB();
-
-  // دمج REC الحالي مع Firebase (الأحدث يفوز)
-  // نُبقي على البيانات المحلية إذا كانت أحدث
-  if(Object.keys(_currentREC).length > 0){
-    Object.keys(_currentREC).forEach(function(key){
-      if(!REC[key] || Object.keys(_currentREC[key]).length > Object.keys(REC[key]||{}).length){
-        REC[key] = _currentREC[key];
-      }
-    });
-    try{ localStorage.setItem("r3_records", JSON.stringify(REC)); }catch(e){}
-  }
 
   // إعادة تشغيل المستمعات لضمان الاتصال
   startRecordsListener();
@@ -1978,58 +1963,132 @@ function exportStudentPDF(){
   }, 800);
 }
 
-// ===== إصلاح autoFill + الحفظ =====
+// ===== الحل الجذري لمشكلة الحفظ والتحديث =====
 (function(){
-  // ننتظر حتى يُحمَّل autoFill الأصلي
+
+  // ===== 1: إصلاح autoFill =====
   var _maxTries = 20;
-  function tryWrap(){
+  function tryWrapAutoFill(){
     if(typeof autoFill !== "function"){
-      if(--_maxTries > 0) setTimeout(tryWrap, 500);
+      if(--_maxTries > 0) setTimeout(tryWrapAutoFill, 500);
       return;
     }
     var _origAutoFill = autoFill;
+
     window.autoFill = function(isStaff){
-      // 1. نُشغّل autoFill الأصلي (يُحدّث REC في الذاكرة)
+      // تشغيل autoFill الأصلي
       _origAutoFill.call(this, isStaff);
 
-      // 2. نحفظ نسخة من REC بعد التعبئة فوراً
-      var _snapshot = {};
-      try{ _snapshot = JSON.parse(JSON.stringify(REC)); }catch(e){ _snapshot = REC; }
+      // أخذ نسخة ثابتة من REC
+      var _snap = {};
+      try{ _snap = JSON.parse(JSON.stringify(REC)); }catch(e){ _snap = REC; }
 
-      // 3. نحفظ في Firebase مباشرة (بـ set بسيط بدون transaction)
+      // حفظ محلي فوري
+      try{ localStorage.setItem("r3_records", JSON.stringify(_snap)); }catch(e){}
+
+      // حفظ في Firebase
+      var _db = typeof _fbDB === "function" ? _fbDB() : null;
+      if(!_db){ return; }
+
+      if(typeof setSyncSaving === "function") setSyncSaving();
+
+      _db.collection("rasid").doc("records").set({ data: _snap })
+        .then(function(){
+          // ثبّت REC من النسخة
+          REC = _snap;
+          try{ localStorage.setItem("r3_records", JSON.stringify(REC)); }catch(e){}
+          if(typeof setSyncOk === "function") setSyncOk();
+          // أعد رسم الجدول
+          setTimeout(function(){
+            try{
+              var _isStaff = (isStaff === true || isStaff === "true");
+              if(typeof renderTable === "function") renderTable(_isStaff);
+              if(typeof updateComp  === "function") updateComp(_isStaff);
+            }catch(e){}
+          }, 600);
+        })
+        .catch(function(err){
+          console.error("autoFill save:", err);
+          if(typeof setSyncErr === "function") setSyncErr();
+        });
+    };
+    console.log("✅ autoFill wrapped");
+  }
+  setTimeout(tryWrapAutoFill, 3000);
+
+  // ===== 2: إصلاح refreshFromCloud - لا يمسّ REC =====
+  var _maxTries2 = 20;
+  function tryWrapRefresh(){
+    if(typeof refreshFromCloud !== "function"){
+      if(--_maxTries2 > 0) setTimeout(tryWrapRefresh, 500);
+      return;
+    }
+
+    window.refreshFromCloud = async function(){
+      if(typeof toast === "function") toast("⏳ جاري جلب البيانات من السحابة...","");
+      if(typeof setSyncSaving === "function") setSyncSaving();
+
+      // حفظ REC الحالي قبل أي تحديث
+      var _savedREC = {};
+      try{ _savedREC = JSON.parse(JSON.stringify(REC)); }catch(e){ _savedREC = REC; }
+
+      // تحديث DB فقط من Firebase (بدون المساس بـ REC)
       var _db = typeof _fbDB === "function" ? _fbDB() : null;
       if(_db){
-        if(typeof setSyncSaving === "function") setSyncSaving();
-        try{ localStorage.setItem("r3_records", JSON.stringify(_snapshot)); }catch(e){}
-
-        _db.collection("rasid").doc("records").set({ data: _snapshot })
-          .then(function(){
-            // الحفظ نجح - نُثبّت REC من النسخة المحفوظة
-            REC = _snapshot;
-            try{ localStorage.setItem("r3_records", JSON.stringify(REC)); }catch(e){}
-            if(typeof setSyncOk === "function") setSyncOk();
-
-            // نُعيد رسم الجدول من REC الصحيح بعد لحظة
-            setTimeout(function(){
-              try{
-                if(typeof renderTable === "function"){
-                  renderTable(isStaff === true || isStaff === "true");
+        try{
+          var snap = await _db.collection("rasid").get();
+          snap.forEach(function(doc){
+            var data = doc.data() && doc.data().data;
+            if(data === undefined || data === null) return;
+            var id = doc.id;
+            if(id === "records"){
+              // دمج فقط - لا استبدال كامل
+              Object.keys(data).forEach(function(k){
+                if(!_savedREC[k]){
+                  _savedREC[k] = data[k];
                 }
-                if(typeof updateComp === "function"){
-                  updateComp(isStaff === true || isStaff === "true");
-                }
-              }catch(e){}
-            }, 500);
-          })
-          .catch(function(err){
-            console.error("autoFill save error:", err);
-            if(typeof setSyncErr === "function") setSyncErr();
+              });
+            } else if(id === "students")  { DB.students  = data; }
+            else if(id === "teachers")  { DB.teachers  = data; }
+            else if(id === "staff")     { DB.staff     = data; }
+            else if(id === "settings")  { DB.settings  = data; }
           });
+        }catch(e){ console.error("refresh error:", e); }
       }
+
+      // استعادة REC المحمي
+      REC = _savedREC;
+      try{ localStorage.setItem("r3_records", JSON.stringify(REC)); }catch(e){}
+
+      // إعادة تشغيل المستمعات
+      if(typeof startRecordsListener  === "function") startRecordsListener();
+      if(typeof startSettingsListener === "function") startSettingsListener();
+
+      // تحديث الواجهة
+      if(typeof renderAdminPanel === "function") renderAdminPanel();
+      if(typeof renderFilesTab   === "function") renderFilesTab();
+
+      var el = document.getElementById("lastSync");
+      if(el) el.textContent = new Date().toLocaleTimeString("ar");
+
+      if(typeof ST_ !== "undefined"){
+        if(ST_.teacher && ST_.tClass){
+          if(typeof buildCBs    === "function") buildCBs(ST_.teacher.classes||[], "tCBts", false);
+          if(typeof renderTable === "function") renderTable(false);
+        }
+        if(ST_.staff && ST_.sClass){
+          if(typeof buildCBs    === "function") buildCBs(ST_.staff.classes||[], "sCBts", true);
+          if(typeof renderTable === "function") renderTable(true);
+        }
+      }
+
+      if(typeof setSyncOk === "function") setSyncOk();
+      if(typeof toast     === "function") toast("✅ تم تحديث البيانات من السحابة","ok");
     };
-    console.log("✅ autoFill wrapped with safe save");
+    console.log("✅ refreshFromCloud wrapped");
   }
-  setTimeout(tryWrap, 3000);
+  setTimeout(tryWrapRefresh, 3500);
+
 })();
 
 </script>
