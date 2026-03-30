@@ -1150,34 +1150,19 @@ function checkRecordingLocked(){
 // wrapper للـ TL و SL للفحص قبل الدخول
 function _wrapLoginWithLockCheck(originalFn, role){
   return function(){
-    // نقرأ من Firebase مباشرة للتأكد
-    var db = typeof _fbDB === "function" ? _fbDB() : null;
-    if(db){
-      db.collection("rasid").doc("settings").get().then(function(snap){
-        var locked = false;
-        if(snap.exists){
-          var raw = snap.data();
-          var s = (raw && raw.data) ? raw.data : raw;
-          locked = s && s.lockRecording === true;
-        }
-        if(locked){
-          var errId = role === "teacher" ? "tErr" : "sErr";
-          var errEl = document.getElementById(errId);
-          if(errEl) errEl.textContent = "🔴 الرصد موقوف حالياً من قِبَل الإدارة";
-        } else {
-          originalFn.apply(this, arguments);
-        }
-      }).catch(function(){
-        originalFn.apply(this, arguments);
-      });
+    // فحص محلي سريع من DB.settings
+    var locked = false;
+    try{
+      if(DB && DB.settings && DB.settings.lockRecording === true) locked = true;
+      else if(window._recordingLocked === true) locked = true;
+    }catch(e){}
+
+    if(locked){
+      var errId = role === "teacher" ? "tErr" : "sErr";
+      var errEl = document.getElementById(errId);
+      if(errEl) errEl.textContent = "🔴 الرصد موقوف حالياً من قِبَل الإدارة";
     } else {
-      if(checkRecordingLocked()){
-        var errId2 = role === "teacher" ? "tErr" : "sErr";
-        var errEl2 = document.getElementById(errId2);
-        if(errEl2) errEl2.textContent = "🔴 الرصد موقوف حالياً من قِبَل الإدارة";
-      } else {
-        originalFn.apply(this, arguments);
-      }
+      originalFn.apply(this, arguments);
     }
   };
 }
