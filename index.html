@@ -1255,7 +1255,7 @@ function dirLogin(){
     // اسم المدرسة في الهيدر
     var schEl = document.getElementById('dirSchName');
     if(schEl && DB && DB.settings){
-      schEl.textContent = (DB.settings.schName||'') + ' | ' + (DB.settings.year||'');
+      schEl.textContent = (DB.settings.sysName||'نظام الرصد المدرسي الذكي') + ' | ' + (DB.settings.schName||'') + ' | ' + (DB.settings.year||'');
     }
     renderDirectorPanel();
   } else {
@@ -1267,192 +1267,157 @@ function renderDirectorPanel(){
   var el = document.getElementById('directorContent');
   if(!el) return;
 
-  var s       = (DB&&DB.settings) ? DB.settings : {};
-  var schName = s.schName || 'مدرسة حمزة بن عبد المطلب الإعدادية للبنين';
-  var year    = s.year    || '2025 - 2026';
+  var s       = (DB&&DB.settings)?DB.settings:{};
+  var schName = s.schName||'مدرسة حمزة بن عبد المطلب الإعدادية للبنين';
+  var sysName = s.sysName||'نظام الرصد المدرسي الذكي';
+  var year    = s.year||'2025 - 2026';
   var teachers= DB.teachers||[];
   var staff   = DB.staff||[];
   var students= DB.students||[];
 
-  // جمع الصفوف
   var allClasses=[];
   teachers.forEach(function(t){(t.classes||[]).forEach(function(c){if(allClasses.indexOf(c)<0)allClasses.push(c);});});
+  staff.forEach(function(sm){(sm.classes||[]).forEach(function(c){if(allClasses.indexOf(c)<0)allClasses.push(c);});});
   allClasses.sort();
 
-  // إحصائيات كلية
-  var totalF=0, totalT=0;
+  function pC(p){return p>=90?'#16a34a':p>=75?'#059669':p>=60?'#ca8a04':p>=45?'#ea580c':'#dc2626';}
+  function pB(p){return p>=90?'#dcfce7':p>=75?'#d1fae5':p>=60?'#fef9c3':p>=45?'#ffedd5':'#fee2e2';}
+  function pL(p){return p>=90?'ممتاز':p>=75?'جيد جداً':p>=60?'جيد':p>=45?'مقبول':'ضعيف';}
+
+  // إحصائيات كل معلم
+  var tStats=[];
   teachers.forEach(function(t){
-    (t.classes||[]).forEach(function(cls){
-      var st=compStat(false,t.username,cls);
-      totalF+=st.f; totalT+=st.t;
-    });
+    var f=0,tt=0;
+    (t.classes||[]).forEach(function(cls){var st=compStat(false,t.username,cls);f+=st.f;tt+=st.t;});
+    tStats.push({name:t.name,subject:t.subject,classes:t.classes||[],f:f,t:tt,p:tt>0?Math.round((f/tt)*100):0});
   });
   staff.forEach(function(sm){
-    (sm.classes||[]).forEach(function(cls){
-      var st=compStat(true,sm.username,cls);
-      totalF+=st.f; totalT+=st.t;
-    });
+    var f=0,tt=0;
+    (sm.classes||[]).forEach(function(cls){var st=compStat(true,sm.username,cls);f+=st.f;tt+=st.t;});
+    tStats.push({name:sm.name,subject:'إداري 🛡️',classes:sm.classes||[],f:f,t:tt,p:tt>0?Math.round((f/tt)*100):0,isStaff:true});
   });
-  var totalPct = totalT>0 ? Math.round((totalF/totalT)*100) : 0;
 
-  function pctColor(p){ return p>=90?'#16a34a':p>=75?'#059669':p>=60?'#ca8a04':p>=45?'#ea580c':'#dc2626'; }
-  function pctBg(p){    return p>=90?'#dcfce7':p>=75?'#d1fae5':p>=60?'#fef9c3':p>=45?'#ffedd5':'#fee2e2'; }
+  // KPIs
+  var totalF=0,totalT=0;
+  tStats.forEach(function(t){totalF+=t.f;totalT+=t.t;});
+  var totalP=totalT>0?Math.round((totalF/totalT)*100):0;
+  var done=tStats.filter(function(t){return t.p>=90;}).length;
+  var inProg=tStats.filter(function(t){return t.p>0&&t.p<90;}).length;
+  var notStarted=tStats.filter(function(t){return t.p===0;}).length;
 
-  // Pie Chart SVG
-  function buildPie(pct, size){
-    size=size||100;
-    var r=size/2-8, cx=size/2, cy=size/2;
-    var angle=(pct/100)*360, rad=angle*Math.PI/180;
-    var x2=cx+r*Math.sin(rad), y2=cy-r*Math.cos(rad);
-    var large=angle>180?1:0;
-    var col=pctColor(pct), bg=pctBg(pct);
-    var arc=pct>=100
-      ? '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+col+'" opacity=".85"/>'
-      : (pct<=0 ? '' : '<path d="M'+cx+' '+(cy-r)+' A'+r+' '+r+' 0 '+large+' 1 '+x2+' '+y2+' L'+cx+' '+cy+' Z" fill="'+col+'" opacity=".85"/>');
-    return '<svg width="'+size+'" height="'+size+'">'
+  // Pie SVG
+  function pie(p,sz){
+    sz=sz||90;var r=sz/2-6,cx=sz/2,cy=sz/2;
+    var ang=(p/100)*360,rad=ang*Math.PI/180;
+    var x2=cx+r*Math.sin(rad),y2=cy-r*Math.cos(rad),lg=ang>180?1:0;
+    var col=pC(p),bg=pB(p);
+    var arc=p>=100?'<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+col+'" opacity=".9"/>'
+      :(p<=0?'':'<path d="M'+cx+' '+(cy-r)+' A'+r+' '+r+' 0 '+lg+' 1 '+x2+' '+y2+' L'+cx+' '+cy+' Z" fill="'+col+'" opacity=".9"/>');
+    return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 '+sz+' '+sz+'">'
       +'<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+bg+'"/>'
       +arc
-      +'<circle cx="'+cx+'" cy="'+cy+'" r="'+(r*0.58)+'" fill="#fff"/>'
-      +'<text x="'+cx+'" y="'+(cy+1)+'" text-anchor="middle" dominant-baseline="middle" font-size="'+(size*0.15)+'" font-weight="900" fill="'+col+'">'+pct+'%</text>'
+      +'<circle cx="'+cx+'" cy="'+cy+'" r="'+(r*.6)+'" fill="white"/>'
+      +'<text x="'+cx+'" y="'+(cy+1)+'" text-anchor="middle" dominant-baseline="middle" font-size="'+(sz*.16)+'" font-weight="900" fill="'+col+'" font-family="Cairo,sans-serif">'+p+'%</text>'
       +'</svg>';
-  }
-
-  // Bar Chart للصفوف
-  function buildClassBars(){
-    if(!allClasses.length) return '<div style="color:#94a3b8;text-align:center;padding:20px">لا توجد بيانات</div>';
-    var bars='';
-    allClasses.forEach(function(cls){
-      var f=0,t=0;
-      teachers.forEach(function(tc){if((tc.classes||[]).indexOf(cls)<0)return;var st=compStat(false,tc.username,cls);f+=st.f;t+=st.t;});
-      staff.forEach(function(sm){if((sm.classes||[]).indexOf(cls)<0)return;var st=compStat(true,sm.username,cls);f+=st.f;t+=st.t;});
-      var p=t>0?Math.round((f/t)*100):0;
-      var col=pctColor(p), bg=pctBg(p);
-      bars+='<div style="margin-bottom:10px">'
-        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
-        +'<span style="font-size:11px;font-weight:700;color:#334155">الصف: '+cls+'</span>'
-        +'<span style="font-size:11px;font-weight:900;color:'+col+'">'+p+'% &nbsp;<span style="font-size:9px;color:#94a3b8">'+f+'/'+t+'</span></span>'
-        +'</div>'
-        +'<div style="background:#e2e8f0;border-radius:99px;height:10px;overflow:hidden">'
-        +'<div style="background:'+col+';width:'+p+'%;height:100%;border-radius:99px;transition:width .6s ease"></div>'
-        +'</div>'
-        +'</div>';
-    });
-    return bars;
   }
 
   var now=new Date().toLocaleDateString('ar-SA-u-ca-gregory',{year:'numeric',month:'long',day:'numeric'});
 
-  var html='<div style="direction:rtl;font-family:Cairo,sans-serif;background:#f1f5f9;min-height:100vh;padding:16px">';
+  var h='<div style="direction:rtl;font-family:Cairo,sans-serif;background:#f1f5f9;min-height:100vh;padding:14px 16px">';
 
-  // هيدر
-  html+='<div style="background:linear-gradient(135deg,#0f2544,#1a3a6b,#1d6fa4);border-radius:14px;padding:18px 24px;margin-bottom:14px;color:#fff">'
-    +'<div style="font-size:17px;font-weight:900">'+schName+'</div>'
-    +'<div style="font-size:11px;opacity:.75;margin-top:2px">نظام الرصد المدرسي الذكي &nbsp;|&nbsp; '+year+' &nbsp;|&nbsp; 📅 '+now+'</div>'
+  // هيدر مدمج
+  h+='<div style="background:linear-gradient(135deg,#0f2544 0%,#1a3a6b 50%,#1d6fa4 100%);border-radius:14px;padding:16px 22px;margin-bottom:14px;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:12px">'
+    +'<div>'
+    +'<div style="font-size:16px;font-weight:900;margin-bottom:2px">'+schName+'</div>'
+    +'<div style="font-size:10px;opacity:.75;margin-top:2px">'+sysName+' &nbsp;|&nbsp; '+year+' &nbsp;·&nbsp; 📅 '+now+'</div>'
+    +'</div>'
+    +'<button onclick="renderDirectorPanel()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:11px;font-weight:700;font-family:Cairo,sans-serif">🔄 تحديث</button>'
     +'</div>';
 
-  // بطاقات إحصائية
-  html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">';
-  var cards=[
-    {icon:'📊',label:'الإنجاز الكلي',val:totalPct+'%',sub:totalF+' من '+totalT,col:'#1d6fa4',bg:'#eff6ff'},
-    {icon:'👨‍🏫',label:'المعلمون',val:teachers.length,sub:'معلم نشط',col:'#059669',bg:'#f0fdf4'},
-    {icon:'👥',label:'الطلاب',val:students.length,sub:'طالب',col:'#7c3aed',bg:'#faf5ff'},
-    {icon:'🏫',label:'الصفوف',val:allClasses.length,sub:'صف',col:'#ea580c',bg:'#fff7ed'},
+  // KPIs
+  h+='<div style="display:grid;grid-template-columns:auto 1fr;gap:12px;margin-bottom:14px;background:#fff;border-radius:14px;padding:16px;border:1px solid #e2e8f0">';
+  // Pie كبير
+  h+='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 8px">'
+    +pie(totalP,110)
+    +'<div style="font-size:10px;color:#64748b;margin-top:4px;text-align:center">الإنجاز الكلي</div>'
+    +'<div style="font-size:10px;font-weight:800;color:'+pC(totalP)+'">'+pL(totalP)+'</div>'
+    +'</div>';
+  // أرقام سريعة
+  h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-content:center">';
+  var kpis=[
+    {icon:'✅',val:done,label:'مكتملون',col:'#16a34a',bg:'#dcfce7'},
+    {icon:'🔄',val:inProg,label:'قيد الإنجاز',col:'#ca8a04',bg:'#fef9c3'},
+    {icon:'⏳',val:notStarted,label:'لم يبدأوا',col:'#dc2626',bg:'#fee2e2'},
+    {icon:'👥',val:students.length,label:'الطلاب',col:'#7c3aed',bg:'#faf5ff'},
+    {icon:'🏫',val:allClasses.length,label:'الصفوف',col:'#ea580c',bg:'#fff7ed'},
+    {icon:'📌',val:totalF+'/'+totalT,label:'تم رصده',col:'#1d6fa4',bg:'#eff6ff'},
   ];
-  cards.forEach(function(c){
-    html+='<div style="background:'+c.bg+';border:1.5px solid '+c.col+'22;border-radius:12px;padding:12px;text-align:center">'
-      +'<div style="font-size:22px">'+c.icon+'</div>'
-      +'<div style="font-size:20px;font-weight:900;color:'+c.col+'">'+c.val+'</div>'
-      +'<div style="font-size:10px;font-weight:700;color:'+c.col+'">'+c.label+'</div>'
-      +'<div style="font-size:9px;color:#94a3b8">'+c.sub+'</div>'
+  kpis.forEach(function(k){
+    h+='<div style="background:'+k.bg+';border-radius:10px;padding:8px;text-align:center">'
+      +'<div style="font-size:18px">'+k.icon+'</div>'
+      +'<div style="font-size:15px;font-weight:900;color:'+k.col+'">'+k.val+'</div>'
+      +'<div style="font-size:9px;color:'+k.col+';font-weight:700">'+k.label+'</div>'
       +'</div>';
   });
-  html+='</div>';
+  h+='</div></div></div>';
 
-  // صف رئيسي: Pie + إنجاز الصفوف
-  html+='<div style="display:grid;grid-template-columns:180px 1fr;gap:12px;margin-bottom:14px">';
+  // تنبيهات
+  var alerts=tStats.filter(function(t){return t.p===0;});
+  if(alerts.length){
+    h+='<div style="background:#fff5f5;border:1.5px solid #fecaca;border-radius:12px;padding:12px 16px;margin-bottom:14px">'
+      +'<div style="font-size:12px;font-weight:800;color:#dc2626;margin-bottom:8px">⚠️ لم يبدأوا الرصد بعد</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:6px">';
+    alerts.forEach(function(t){
+      h+='<span style="background:#fee2e2;color:#b91c1c;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px">'+t.name+' — '+t.subject+'</span>';
+    });
+    h+='</div></div>';
+  }
 
-  // Pie
-  html+='<div style="background:#fff;border-radius:12px;padding:16px;border:1px solid #e2e8f0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">'
-    +'<div style="font-size:11px;font-weight:800;color:#475569">🎯 الإنجاز الكلي</div>'
-    +buildPie(totalPct,120)
-    +'<div style="text-align:center">'
-    +'<div style="font-size:10px;color:#64748b">تم الرصد: <b style="color:'+pctColor(totalPct)+'">'+totalF+'</b></div>'
-    +'<div style="font-size:10px;color:#64748b">الإجمالي: <b>'+totalT+'</b></div>'
-    +'</div></div>';
+  // بطاقات المعلمين
+  h+='<div style="margin-bottom:14px">'
+    +'<div style="font-size:12px;font-weight:800;color:#1e293b;margin-bottom:10px">👨‍🏫 نسبة إنجاز الرصد</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">';
+
+  tStats.sort(function(a,b){return b.p-a.p;}).forEach(function(t){
+    var col=pC(t.p),bg=pB(t.p);
+    h+='<div style="background:#fff;border-radius:12px;padding:12px 14px;border:1.5px solid '+col+'33;position:relative;overflow:hidden">'
+      +'<div style="position:absolute;top:0;right:0;width:4px;height:100%;background:'+col+'"></div>'
+      +'<div style="font-size:12px;font-weight:800;color:#1e293b;margin-bottom:1px">'+t.name+'</div>'
+      +'<div style="font-size:10px;color:#64748b;margin-bottom:8px">'+t.subject+(t.classes.length?' &nbsp;·&nbsp; '+t.classes.join(', '):'')+'</div>'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +'<div style="flex:1;background:#e2e8f0;border-radius:99px;height:7px;overflow:hidden">'
+      +'<div style="background:'+col+';width:'+t.p+'%;height:100%;border-radius:99px"></div>'
+      +'</div>'
+      +'<span style="font-size:13px;font-weight:900;color:'+col+'">'+t.p+'%</span>'
+      +'</div>'
+      +'<div style="display:flex;justify-content:space-between;margin-top:5px">'
+      +'<span style="font-size:9px;color:#94a3b8">'+t.f+' من '+t.t+'</span>'
+      +'<span style="background:'+bg+';color:'+col+';font-size:9px;font-weight:800;padding:1px 8px;border-radius:20px">'+pL(t.p)+'</span>'
+      +'</div></div>';
+  });
+  h+='</div></div>';
 
   // إنجاز الصفوف
-  html+='<div style="background:#fff;border-radius:12px;padding:16px;border:1px solid #e2e8f0">'
-    +'<div style="font-size:12px;font-weight:800;color:#1e293b;margin-bottom:12px">📚 إنجاز الصفوف</div>'
-    +buildClassBars()
-    +'</div>';
-  html+='</div>';
-
-  // جدول المعلمين والإداريين
-  html+='<div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:14px">'
-    +'<div style="background:linear-gradient(135deg,#1a3a6b,#1d6fa4);color:#fff;padding:11px 16px;font-size:12px;font-weight:800">👨‍🏫 المعلمون والإداريون — نسبة إنجاز الرصد</div>'
-    +'<table style="width:100%;border-collapse:collapse;font-size:11px">'
-    +'<thead><tr style="background:#f8fafc">'
-    +'<th style="padding:8px 14px;text-align:right;border-bottom:1.5px solid #e2e8f0;color:#475569;font-weight:700">#</th>'
-    +'<th style="padding:8px 14px;text-align:right;border-bottom:1.5px solid #e2e8f0;color:#475569;font-weight:700">الاسم</th>'
-    +'<th style="padding:8px 14px;text-align:right;border-bottom:1.5px solid #e2e8f0;color:#475569;font-weight:700">المادة / الدور</th>'
-    +'<th style="padding:8px 14px;text-align:right;border-bottom:1.5px solid #e2e8f0;color:#475569;font-weight:700">الصفوف</th>'
-    +'<th style="padding:8px;text-align:center;border-bottom:1.5px solid #e2e8f0;color:#475569;font-weight:700;min-width:180px">نسبة الإنجاز</th>'
-    +'</tr></thead><tbody>';
-
-  var rowNum=1;
-  teachers.forEach(function(t){
-    var tF=0,tT=0;
-    (t.classes||[]).forEach(function(cls){var st=compStat(false,t.username,cls);tF+=st.f;tT+=st.t;});
-    var p=tT>0?Math.round((tF/tT)*100):0;
-    var col=pctColor(p), bg=pctBg(p);
-    html+='<tr style="border-bottom:1px solid #f1f5f9">'
-      +'<td style="padding:9px 14px;color:#94a3b8;font-weight:600">'+rowNum+'</td>'
-      +'<td style="padding:9px 14px;font-weight:800;color:#1e293b">'+t.name+'</td>'
-      +'<td style="padding:9px 14px;color:#475569">'+t.subject+'</td>'
-      +'<td style="padding:9px 14px;color:#64748b;font-size:10px">'+(t.classes||[]).join(' | ')+'</td>'
-      +'<td style="padding:7px 10px">'
-      +'<div style="display:flex;align-items:center;gap:8px">'
-      +'<div style="flex:1;background:#e2e8f0;border-radius:99px;height:8px;overflow:hidden">'
+  h+='<div style="background:#fff;border-radius:12px;padding:14px 16px;border:1px solid #e2e8f0;margin-bottom:14px">'
+    +'<div style="font-size:12px;font-weight:800;color:#1e293b;margin-bottom:12px">📚 إنجاز الصفوف</div>';
+  allClasses.forEach(function(cls){
+    var f=0,t=0;
+    teachers.forEach(function(tc){if((tc.classes||[]).indexOf(cls)<0)return;var st=compStat(false,tc.username,cls);f+=st.f;t+=st.t;});
+    staff.forEach(function(sm){if((sm.classes||[]).indexOf(cls)<0)return;var st=compStat(true,sm.username,cls);f+=st.f;t+=st.t;});
+    var p=t>0?Math.round((f/t)*100):0,col=pC(p),bg=pB(p);
+    h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px">'
+      +'<div style="font-size:11px;font-weight:700;color:#334155;min-width:60px">'+cls+'</div>'
+      +'<div style="flex:1;background:#e2e8f0;border-radius:99px;height:9px;overflow:hidden">'
       +'<div style="background:'+col+';width:'+p+'%;height:100%;border-radius:99px"></div>'
       +'</div>'
       +'<span style="font-size:12px;font-weight:900;color:'+col+';min-width:38px;text-align:left">'+p+'%</span>'
-      +'<span style="background:'+bg+';color:'+col+';font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px">'+tF+'/'+tT+'</span>'
-      +'</div></td>'
-      +'</tr>';
-    rowNum++;
+      +'<span style="background:'+bg+';color:'+col+';font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap">'+f+'/'+t+'</span>'
+      +'</div>';
   });
+  h+='</div>';
 
-  staff.forEach(function(sm){
-    var sF=0,sT=0;
-    (sm.classes||[]).forEach(function(cls){var st=compStat(true,sm.username,cls);sF+=st.f;sT+=st.t;});
-    var p=sT>0?Math.round((sF/sT)*100):0;
-    var col=pctColor(p), bg=pctBg(p);
-    html+='<tr style="border-bottom:1px solid #f1f5f9;background:#faf5ff">'
-      +'<td style="padding:9px 14px;color:#94a3b8;font-weight:600">'+rowNum+'</td>'
-      +'<td style="padding:9px 14px;font-weight:800;color:#7c3aed">'+sm.name+'</td>'
-      +'<td style="padding:9px 14px;color:#7c3aed;font-size:10px">🛡️ إداري</td>'
-      +'<td style="padding:9px 14px;color:#64748b;font-size:10px">'+(sm.classes||[]).join(' | ')+'</td>'
-      +'<td style="padding:7px 10px">'
-      +'<div style="display:flex;align-items:center;gap:8px">'
-      +'<div style="flex:1;background:#e2e8f0;border-radius:99px;height:8px;overflow:hidden">'
-      +'<div style="background:'+col+';width:'+p+'%;height:100%;border-radius:99px"></div>'
-      +'</div>'
-      +'<span style="font-size:12px;font-weight:900;color:'+col+';min-width:38px;text-align:left">'+p+'%</span>'
-      +'<span style="background:'+bg+';color:'+col+';font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px">'+sF+'/'+sT+'</span>'
-      +'</div></td>'
-      +'</tr>';
-    rowNum++;
-  });
-
-  html+='</tbody></table></div>';
-
-  // زر تحديث
-  html+='<div style="text-align:center;padding-bottom:20px">'
-    +'<button onclick="renderDirectorPanel()" class="btn sm" style="background:#1d6fa4;color:#fff">🔄 تحديث البيانات</button>'
-    +'</div>';
-
-  html+='</div>';
-  el.innerHTML=html;
+  h+='</div>';
+  el.innerHTML=h;
 }
 
 
