@@ -1264,11 +1264,6 @@ function renderDirectorPanel(){
     subjects[subj].push(t);
   });
 
-  var allClasses=[];
-  teachers.forEach(function(t){(t.classes||[]).forEach(function(c){if(allClasses.indexOf(c)<0)allClasses.push(c);});});
-  staff.forEach(function(sm){(sm.classes||[]).forEach(function(c){if(allClasses.indexOf(c)<0)allClasses.push(c);});});
-  allClasses.sort();
-
   var gF=0,gT=0;
   teachers.forEach(function(t){(t.classes||[]).forEach(function(c){var st=compStat(false,t.username,c);gF+=st.f;gT+=st.t;});});
   staff.forEach(function(sm){(sm.classes||[]).forEach(function(c){var st=compStat(true,sm.username,c);gF+=st.f;gT+=st.t;});});
@@ -1286,12 +1281,18 @@ function renderDirectorPanel(){
   h.push('<div style="font-size:10px;opacity:.7">'+sysName+' | '+year+'</div></div>');
   h.push('<div style="display:flex;align-items:center;gap:14px">');
   h.push('<div style="text-align:center"><div style="font-size:20px;font-weight:900;color:'+pC(gP)+'">'+gP+'%</div><div style="font-size:9px;opacity:.8">إنجاز المدرسة</div></div>');
-  h.push('<button onclick="renderDirectorPanel()" style="background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.4);border-radius:8px;padding:7px 16px;cursor:pointer;font-size:11px;font-weight:800;font-family:Cairo,sans-serif">🔄 تحديث البيانات</button>');
+  // زر التحديث - يستدعي loadAllFromFB ثم renderDirectorPanel
+  h.push('<button id="dirRefreshBtn" onclick="(async function(){');
+  h.push('var btn=document.getElementById('dirRefreshBtn');');
+  h.push('if(btn){btn.disabled=true;btn.textContent='⏳ جاري التحديث...';}');
+  h.push('try{if(typeof loadAllFromFB==='function')await loadAllFromFB();}catch(e){}');
+  h.push('renderDirectorPanel();');
+  h.push('})()" style="background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.4);border-radius:8px;padding:7px 16px;cursor:pointer;font-size:11px;font-weight:800;font-family:Cairo,sans-serif">🔄 تحديث البيانات</button>');
   h.push('</div></div>');
 
   // KPIs
   h.push('<div style="background:#fff;border-bottom:1px solid #e2e8f0;padding:8px 20px;display:flex;gap:18px;align-items:center;flex-wrap:wrap">');
-  [[gP+'%','الإنجاز الكلي','📊',pC(gP)],[teachers.length,'المعلمون','👨‍🏫','#059669'],[doneT,'مكتملون','✅','#16a34a'],[inpT,'قيد الرصد','🔄','#ca8a04'],[notT,'لم يبدأوا','⏳','#dc2626'],[allClasses.length,'الصفوف','🏫','#ea580c']].forEach(function(k){
+  [[gP+'%','الإنجاز الكلي','📊',pC(gP)],[teachers.length,'المعلمون','👨‍🏫','#059669'],[doneT,'مكتملون','✅','#16a34a'],[inpT,'قيد الرصد','🔄','#ca8a04'],[notT,'لم يبدأوا','⏳','#dc2626']].forEach(function(k){
     h.push('<div style="display:flex;align-items:center;gap:5px"><span style="font-size:14px">'+k[2]+'</span><div><div style="font-size:13px;font-weight:900;color:'+k[3]+'">'+k[0]+'</div><div style="font-size:9px;color:#94a3b8">'+k[1]+'</div></div></div>');
   });
   h.push('</div>');
@@ -1312,7 +1313,7 @@ function renderDirectorPanel(){
     h.push('<table style="width:100%;border-collapse:collapse;font-size:11px">');
     notKeys.forEach(function(subj,i){
       h.push('<tr style="border-bottom:1px solid #fee2e2;background:'+(i%2===0?'#fff':'#fff5f5')+'">');
-      h.push('<td style="padding:7px 14px;font-weight:800;color:#b91c1c;white-space:nowrap;width:160px">'+subj+'</td>');
+      h.push('<td style="padding:7px 14px;font-weight:800;color:#b91c1c;width:160px">'+subj+'</td>');
       h.push('<td style="padding:7px 14px"><div style="display:flex;flex-wrap:wrap;gap:4px">');
       notMap[subj].forEach(function(n){h.push('<span style="background:#fee2e2;color:#b91c1c;font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px">'+n+'</span>');});
       h.push('</div></td></tr>');
@@ -1320,7 +1321,7 @@ function renderDirectorPanel(){
     h.push('</table></div>');
   }
 
-  // دالة بناء جدول القسم - بدون header أعمدة، كل معلم صف ببطاقاته متجاورة
+  // دالة بناء جدول القسم
   function buildSection(tList, secLabel, isStaff){
     var secF=0,secT=0;
     var qCls=[];
@@ -1337,39 +1338,39 @@ function renderDirectorPanel(){
 
     h.push('<div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px">');
 
-    // رأس القسم
+    // رأس القسم - يعرض إنجاز القسم فقط
     h.push('<div style="background:'+sBg+';border-bottom:2px solid '+sCol+'44;padding:8px 14px;display:flex;justify-content:space-between;align-items:center">');
     h.push('<div style="display:flex;align-items:center;gap:8px">');
     h.push('<span style="font-size:15px">'+(isStaff?'🛡️':'📚')+'</span>');
     h.push('<div><div style="font-size:13px;font-weight:900;color:#1e293b">'+secLabel+'</div>');
     h.push('<div style="font-size:9px;color:#64748b">'+tList.length+' '+(isStaff?'إداري':'معلم')+'</div></div></div>');
-    h.push('<div style="text-align:center"><div style="font-size:15px;font-weight:900;color:'+sCol+'">'+secP+'%</div>');
-    h.push('<div style="font-size:9px;font-weight:700;color:'+sCol+'">'+pL(secP)+'</div></div></div>');
+    // إنجاز القسم فقط (بدون أي صفوف)
+    h.push('<div style="display:flex;align-items:center;gap:10px">');
+    h.push('<div style="font-size:10px;color:#64748b">إنجاز القسم</div>');
+    h.push('<div style="background:'+sCol+';color:#fff;border-radius:10px;padding:5px 14px;text-align:center">');
+    h.push('<div style="font-size:16px;font-weight:900">'+secP+'%</div>');
+    h.push('<div style="font-size:8px;opacity:.9">'+pL(secP)+'</div>');
+    h.push('</div></div></div>');
 
-    // جسم الجدول - كل معلم في صف واحد مع بطاقاته مجاورة بعضها
+    // صفوف المعلمين - كل معلم = اسم + بطاقاته + إنجازه
     h.push('<div>');
     tList.forEach(function(t,ti){
       var tF=0,tT=0;
-      var rowBg = ti%2===0?'#fff':'#fafafa';
-
-      h.push('<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid #f1f5f9;background:'+rowBg+'">');
+      h.push('<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid #f1f5f9;background:'+(ti%2===0?'#fff':'#fafafa')+'">');
 
       // اسم المعلم
-      h.push('<div style="min-width:130px;max-width:150px;flex-shrink:0">');
-      h.push('<div style="font-size:11px;font-weight:800;color:'+(isStaff?'#7c3aed':'#1e293b')+'">'+t.name+'</div>');
-      h.push('</div>');
+      h.push('<div style="min-width:130px;max-width:150px;flex-shrink:0;font-size:11px;font-weight:800;color:'+(isStaff?'#7c3aed':'#1e293b')+'">'+t.name+'</div>');
 
       // بطاقات الصفوف مجاورة
-      h.push('<div style="display:flex;flex-wrap:wrap;gap:6px;flex:1">');
+      h.push('<div style="display:flex;flex-wrap:wrap;gap:5px;flex:1">');
       qCls.forEach(function(cls){
-        var hasClass=(t.classes||[]).indexOf(cls)>=0;
-        if(!hasClass) return; // نتجاهل الصفوف غير المخصصة
+        if((t.classes||[]).indexOf(cls)<0) return;
         var st=compStat(isStaff,t.username,cls);
         tF+=st.f; tT+=st.t;
         var p=st.t>0?Math.round((st.f/st.t)*100):0;
         var col=pC(p), bg=pB(p);
-        h.push('<div style="background:'+bg+';border-radius:8px;padding:4px 8px;text-align:center;min-width:54px;border:1px solid '+col+'33">');
-        h.push('<div style="font-size:9px;font-weight:700;color:'+col+';opacity:.85">'+cls+'</div>');
+        h.push('<div style="background:'+bg+';border-radius:8px;padding:4px 8px;text-align:center;min-width:52px;border:1px solid '+col+'33">');
+        h.push('<div style="font-size:9px;font-weight:700;color:'+col+';opacity:.8">'+cls+'</div>');
         h.push('<div style="font-size:13px;font-weight:900;color:'+col+'">'+p+'%</div>');
         h.push('<div style="font-size:8px;color:'+col+';opacity:.8">'+st.f+'/'+st.t+'</div>');
         h.push('</div>');
@@ -1378,37 +1379,17 @@ function renderDirectorPanel(){
 
       // إنجاز المعلم الكلي
       var totP=tT>0?Math.round((tF/tT)*100):0;
-      h.push('<div style="min-width:70px;text-align:center;background:'+pB(totP)+';border-radius:8px;padding:5px 8px;flex-shrink:0">');
+      h.push('<div style="min-width:68px;flex-shrink:0;background:'+pB(totP)+';border-radius:8px;padding:5px 8px;text-align:center">');
       h.push('<div style="font-size:13px;font-weight:900;color:'+pC(totP)+'">'+totP+'%</div>');
       h.push('<div style="font-size:9px;font-weight:700;color:'+pC(totP)+'">'+pL(totP)+'</div>');
-      h.push('</div>');
-
-      h.push('</div>');
+      h.push('</div></div>');
     });
-
-    // صف إنجاز الصف
-    h.push('<div style="display:flex;align-items:center;gap:8px;padding:7px 14px;background:'+sBg+'44;border-top:1.5px solid '+sCol+'33">');
-    h.push('<div style="min-width:130px;max-width:150px;flex-shrink:0;font-size:11px;font-weight:800;color:'+sCol+'">إنجاز الصف</div>');
-    h.push('<div style="display:flex;flex-wrap:wrap;gap:6px;flex:1">');
-    qCls.forEach(function(cls){
-      var f=0,t=0;
-      tList.forEach(function(tc){if((tc.classes||[]).indexOf(cls)<0)return;var st=compStat(isStaff,tc.username,cls);f+=st.f;t+=st.t;});
-      var p=t>0?Math.round((f/t)*100):0;
-      h.push('<div style="min-width:54px;text-align:center">');
-      h.push('<span style="font-size:12px;font-weight:900;color:'+pC(p)+'">'+p+'%</span>');
-      h.push('</div>');
-    });
-    h.push('</div>');
-    h.push('<div style="min-width:70px;text-align:center"><span style="font-size:13px;font-weight:900;color:'+sCol+'">'+secP+'%</span></div>');
-    h.push('</div>');
-
     h.push('</div></div>');
   }
 
   Object.keys(subjects).forEach(function(subj){
     buildSection(subjects[subj], subj, false);
   });
-
   if(staff.length){
     buildSection(staff, 'التقييم الإداري', true);
   }
