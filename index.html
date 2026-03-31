@@ -608,18 +608,8 @@ tbody td:nth-child(2){text-align:right}
 
 <!-- ============================== TAB 5: DIRECTOR ============================== -->
 <div class="panel" id="p5" style="display:none">
-
-  <!-- هيدر بوابة المدير -->
-  <div id="dirHdr" style="display:none;background:linear-gradient(135deg,#1a3a6b,#1d6fa4);color:#fff;padding:10px 20px;align-items:center;justify-content:space-between;gap:12px">
-    <div>
-      <div style="font-size:15px;font-weight:900">📊 لوحة متابعة الإنجاز</div>
-      <div id="dirSchName" style="font-size:11px;opacity:.8"></div>
-    </div>
-    <button onclick="goToRoleGateway()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:700">🏠 الشاشة الرئيسية</button>
-  </div>
-
   <!-- بوابة دخول المدير -->
-  <div id="directorLogin" style="max-width:440px;margin:50px auto">
+  <div id="directorLogin" style="max-width:440px;margin:60px auto;padding:0 16px">
     <div class="lbox" style="background:linear-gradient(135deg,#f0f7ff,#dbeafe);border:2px solid #1d6fa433">
       <span style="font-weight:800;color:#1d6fa4;font-size:15px">📊 بوابة المدير / النائب الأكاديمي</span>
       <input type="text"     id="dirU" class="inp" placeholder="اسم المستخدم" style="margin-top:10px">
@@ -631,11 +621,8 @@ tbody td:nth-child(2){text-align:right}
       <button onclick="goToRoleGateway()" class="btn bgl sm">🏠 الشاشة الرئيسية</button>
     </div>
   </div>
-
-  <!-- لوحة الإنجاز -->
-  <div id="directorPanel" style="display:none">
-    <div id="directorContent"></div>
-  </div>
+  <!-- لوحة الإنجاز - تُبنى هنا مباشرة -->
+  <div id="directorContent" style="display:none"></div>
 </div>
 
 </div><!-- /main -->
@@ -1148,8 +1135,7 @@ document.addEventListener("DOMContentLoaded", function(){
 function goToRoleGateway(){
   // إخفاء p5 عند العودة
   var p5=document.getElementById("p5"); if(p5) p5.style.display="none";
-  var dHdr=document.getElementById("dirHdr"); if(dHdr) dHdr.style.display="none";
-  var dPanel=document.getElementById("directorPanel"); if(dPanel) dPanel.style.display="none";
+  var dc2=document.getElementById("directorContent"); if(dc2) dc2.style.display="none";
   var dLogin=document.getElementById("directorLogin"); if(dLogin) dLogin.style.display="";
   const gw      = document.getElementById("roleGateway");
   const tabsBar = document.getElementById("mainTabs");
@@ -1248,15 +1234,8 @@ function dirLogin(){
   if(!u||!p){ if(err) err.textContent='❌ أدخل اسم المستخدم وكلمة المرور'; return; }
   if(u.trim()==='admin' && p.trim()==='admin'){
     document.getElementById('directorLogin').style.display = 'none';
-    document.getElementById('directorPanel').style.display = '';
-    // إظهار الهيدر
-    var hdr = document.getElementById('dirHdr');
-    if(hdr){ hdr.style.display = 'flex'; }
-    // اسم المدرسة في الهيدر
-    var schEl = document.getElementById('dirSchName');
-    if(schEl && DB && DB.settings){
-      schEl.textContent = (DB.settings.sysName||'نظام الرصد المدرسي الذكي') + ' | ' + (DB.settings.schName||'') + ' | ' + (DB.settings.year||'');
-    }
+    var dc = document.getElementById('directorContent');
+    if(dc) dc.style.display = 'block';
     renderDirectorPanel();
   } else {
     if(err) err.textContent = '❌ اسم المستخدم أو كلمة المرور غير صحيحة';
