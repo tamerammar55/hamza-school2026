@@ -221,7 +221,7 @@ tbody td:nth-child(2){text-align:right}
 .sinp:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(29,111,164,.1)}
 .ssel{padding:5px 9px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-family:var(--font);outline:none;background:#fff;cursor:pointer;transition:background .15s,color .15s}
 .ssel:focus{border-color:var(--blue)}
-.tinp{width:120px;padding:5px 7px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-family:var(--font);text-align:right;outline:none;display:none!important}
+.tinp{width:120px;padding:5px 7px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-family:var(--font);text-align:right;outline:none}
 
 /* PROGRESS */
 .pb{background:var(--border);border-radius:4px;height:6px;overflow:hidden;width:80px}
@@ -608,6 +608,17 @@ tbody td:nth-child(2){text-align:right}
 
 <!-- ============================== TAB 5: DIRECTOR ============================== -->
 <div class="panel" id="p5" style="display:none">
+
+  <!-- هيدر بوابة المدير -->
+  <div id="dirHdr" style="display:none;background:linear-gradient(135deg,#1a3a6b,#1d6fa4);color:#fff;padding:10px 20px;align-items:center;justify-content:space-between;gap:12px">
+    <div>
+      <div style="font-size:15px;font-weight:900">📊 لوحة متابعة الإنجاز</div>
+      <div id="dirSchName" style="font-size:11px;opacity:.8"></div>
+    </div>
+    <button onclick="goToRoleGateway()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:700">🏠 الشاشة الرئيسية</button>
+  </div>
+
+  <!-- بوابة دخول المدير -->
   <div id="directorLogin" style="max-width:440px;margin:50px auto">
     <div class="lbox" style="background:linear-gradient(135deg,#f0f7ff,#dbeafe);border:2px solid #1d6fa433">
       <span style="font-weight:800;color:#1d6fa4;font-size:15px">📊 بوابة المدير / النائب الأكاديمي</span>
@@ -616,7 +627,12 @@ tbody td:nth-child(2){text-align:right}
       <button class="btn bb" onclick="dirLogin()" style="background:#1d6fa4">🔑 دخول</button>
       <div id="dirErr" style="color:#dc2626;font-size:12px;min-height:16px;margin-top:4px"></div>
     </div>
+    <div style="text-align:center;margin-top:12px">
+      <button onclick="goToRoleGateway()" class="btn bgl sm">🏠 الشاشة الرئيسية</button>
+    </div>
   </div>
+
+  <!-- لوحة الإنجاز -->
   <div id="directorPanel" style="display:none">
     <div id="directorContent"></div>
   </div>
@@ -1130,6 +1146,11 @@ document.addEventListener("DOMContentLoaded", function(){
 // ===================== ROLE GATEWAY =====================
 
 function goToRoleGateway(){
+  // إخفاء p5 عند العودة
+  var p5=document.getElementById("p5"); if(p5) p5.style.display="none";
+  var dHdr=document.getElementById("dirHdr"); if(dHdr) dHdr.style.display="none";
+  var dPanel=document.getElementById("directorPanel"); if(dPanel) dPanel.style.display="none";
+  var dLogin=document.getElementById("directorLogin"); if(dLogin) dLogin.style.display="";
   const gw      = document.getElementById("roleGateway");
   const tabsBar = document.getElementById("mainTabs");
   const header  = document.querySelector(".hdr");
@@ -1209,9 +1230,11 @@ function selectRole(role){
     if(header)  header.style.display  = "none";
     adminOnlyEls.forEach(el=>{ if(el) el.style.display="none"; });
     hideGW();
-    // إظهار p5
+    // إخفاء كل panels أولاً
+    document.querySelectorAll('.panel').forEach(function(p){ p.style.display='none'; p.classList.remove('on'); });
+    // إظهار p5 فقط
     var p5 = document.getElementById('p5');
-    if(p5) p5.style.display = '';
+    if(p5){ p5.style.display = 'block'; p5.classList.add('on'); }
   }
   window._currentRole = role;
 }
@@ -1226,6 +1249,14 @@ function dirLogin(){
   if(u.trim()==='admin' && p.trim()==='admin'){
     document.getElementById('directorLogin').style.display = 'none';
     document.getElementById('directorPanel').style.display = '';
+    // إظهار الهيدر
+    var hdr = document.getElementById('dirHdr');
+    if(hdr){ hdr.style.display = 'flex'; }
+    // اسم المدرسة في الهيدر
+    var schEl = document.getElementById('dirSchName');
+    if(schEl && DB && DB.settings){
+      schEl.textContent = (DB.settings.schName||'') + ' | ' + (DB.settings.year||'');
+    }
     renderDirectorPanel();
   } else {
     if(err) err.textContent = '❌ اسم المستخدم أو كلمة المرور غير صحيحة';
@@ -2125,19 +2156,6 @@ document.addEventListener('input', function(e){
   if(e.target.classList.contains('ssel')) _colorSsel(e.target);
 });
 
-// إخفاء عمود الملاحظات بعد بناء الجدول
-function _hideNoteColumns(){
-  // إخفاء كل td/th يحتوي على .tinp
-  document.querySelectorAll('td:has(.tinp), th:has(.tinp)').forEach(function(el){
-    el.style.display='none';
-  });
-  // إخفاء .tinp مباشرة
-  document.querySelectorAll('.tinp').forEach(function(el){
-    var td = el.closest('td');
-    if(td) td.style.display='none';
-    else el.style.display='none';
-  });
-}
 document.addEventListener('change', function(e){
   if(e.target.classList.contains('ssel')) _colorSsel(e.target);
 });
@@ -2145,13 +2163,11 @@ document.addEventListener('change', function(e){
 var _cObs = new MutationObserver(function(m){
   if(m.some(function(x){return x.addedNodes.length>0;})){
     setTimeout(_colorAll,150);
-    setTimeout(_hideNoteColumns,200);
   }
 });
 document.addEventListener('DOMContentLoaded', function(){
   _cObs.observe(document.body,{childList:true,subtree:true});
   setTimeout(_colorAll,1500);
-  setTimeout(_hideNoteColumns,1600);
 });
 
 // ===== timestamp لآخر حفظ =====
