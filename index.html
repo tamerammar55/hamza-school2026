@@ -1282,13 +1282,8 @@ function renderDirectorPanel(){
   h.push('<div style="display:flex;align-items:center;gap:14px">');
   h.push('<div style="text-align:center"><div style="font-size:20px;font-weight:900;color:'+pC(gP)+'">'+gP+'%</div><div style="font-size:9px;opacity:.8">إنجاز المدرسة</div></div>');
   // زر التحديث - يستدعي loadAllFromFB ثم renderDirectorPanel
-  h.push('<button id="dirRefreshBtn" onclick="(async function(){');
-  h.push('var btn=document.getElementById('dirRefreshBtn');');
-  h.push('if(btn){btn.disabled=true;btn.textContent='⏳ جاري التحديث...';}');
-  h.push('try{if(typeof loadAllFromFB==='function')await loadAllFromFB();}catch(e){}');
-  h.push('renderDirectorPanel();');
-  h.push('})()" style="background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.4);border-radius:8px;padding:7px 16px;cursor:pointer;font-size:11px;font-weight:800;font-family:Cairo,sans-serif">🔄 تحديث البيانات</button>');
-  h.push('</div></div>');
+  h.push('<button onclick="dirRefreshData()" style="background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.4);border-radius:8px;padding:7px 16px;cursor:pointer;font-size:11px;font-weight:800;font-family:Cairo,sans-serif" id="dirRefreshBtn">🔄 تحديث البيانات</button>');
+h.push('</div></div>');
 
   // KPIs
   h.push('<div style="background:#fff;border-bottom:1px solid #e2e8f0;padding:8px 20px;display:flex;gap:18px;align-items:center;flex-wrap:wrap">');
@@ -1396,6 +1391,16 @@ function renderDirectorPanel(){
 
   h.push('</div></div>');
   el.innerHTML=h.join('');
+}
+
+
+async function dirRefreshData(){
+  var btn = document.getElementById('dirRefreshBtn');
+  if(btn){ btn.disabled=true; btn.textContent='⏳ جاري...'; }
+  try{
+    if(typeof loadAllFromFB === 'function') await loadAllFromFB();
+  }catch(e){}
+  renderDirectorPanel();
 }
 
 
