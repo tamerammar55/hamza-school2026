@@ -221,7 +221,7 @@ tbody td:nth-child(2){text-align:right}
 .sinp:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(29,111,164,.1)}
 .ssel{padding:5px 9px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-family:var(--font);outline:none;background:#fff;cursor:pointer;transition:background .15s,color .15s}
 .ssel:focus{border-color:var(--blue)}
-.tinp{width:120px;padding:5px 7px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-family:var(--font);text-align:right;outline:none}
+.tinp{width:120px;padding:5px 7px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-family:var(--font);text-align:right;outline:none;display:none!important}
 
 /* PROGRESS */
 .pb{background:var(--border);border-radius:4px;height:6px;overflow:hidden;width:80px}
@@ -433,6 +433,11 @@ tbody td:nth-child(2){text-align:right}
       <div class="gc-title">ولي أمر</div>
       <div class="gc-sub">عرض تقرير<br>الطالب</div>
     </div>
+    <div class="gate-card" onclick="selectRole('director')" style="background:rgba(13,111,164,.2);border-color:rgba(13,111,164,.5)">
+      <div class="gc-icon">📊</div>
+      <div class="gc-title">المدير / النائب</div>
+      <div class="gc-sub">متابعة الإنجاز<br>المباشر</div>
+    </div>
   </div>
   <div class="gate-footer">اختر دورك للمتابعة</div>
 </div>
@@ -599,6 +604,22 @@ tbody td:nth-child(2){text-align:right}
   </div>
   <!-- شهادة الطالب -->
   <div id="parentReport" style="display:none"></div>
+</div>
+
+<!-- ============================== TAB 5: DIRECTOR ============================== -->
+<div class="panel" id="p5" style="display:none">
+  <div id="directorLogin" style="max-width:440px;margin:50px auto">
+    <div class="lbox" style="background:linear-gradient(135deg,#f0f7ff,#dbeafe);border:2px solid #1d6fa433">
+      <span style="font-weight:800;color:#1d6fa4;font-size:15px">📊 بوابة المدير / النائب الأكاديمي</span>
+      <input type="text"     id="dirU" class="inp" placeholder="اسم المستخدم" style="margin-top:10px">
+      <input type="password" id="dirP" class="inp" placeholder="كلمة المرور" onkeydown="if(event.key==='Enter')dirLogin()">
+      <button class="btn bb" onclick="dirLogin()" style="background:#1d6fa4">🔑 دخول</button>
+      <div id="dirErr" style="color:#dc2626;font-size:12px;min-height:16px;margin-top:4px"></div>
+    </div>
+  </div>
+  <div id="directorPanel" style="display:none">
+    <div id="directorContent"></div>
+  </div>
 </div>
 
 </div><!-- /main -->
@@ -1181,8 +1202,195 @@ function selectRole(role){
     _injectHeaderHomeBtn();
     hideGW();
     if(typeof ST === "function") ST(4);
+
+  } else if(role === 'director'){
+    // مدير / نائب
+    if(tabsBar) tabsBar.style.display = "none";
+    if(header)  header.style.display  = "none";
+    adminOnlyEls.forEach(el=>{ if(el) el.style.display="none"; });
+    hideGW();
+    // إظهار p5
+    var p5 = document.getElementById('p5');
+    if(p5) p5.style.display = '';
   }
   window._currentRole = role;
+}
+
+// ===================== بوابة المدير / النائب =====================
+
+function dirLogin(){
+  var u = (document.getElementById('dirU')||{}).value||'';
+  var p = (document.getElementById('dirP')||{}).value||'';
+  var err = document.getElementById('dirErr');
+  if(!u||!p){ if(err) err.textContent='❌ أدخل اسم المستخدم وكلمة المرور'; return; }
+  if(u.trim()==='admin' && p.trim()==='admin'){
+    document.getElementById('directorLogin').style.display = 'none';
+    document.getElementById('directorPanel').style.display = '';
+    renderDirectorPanel();
+  } else {
+    if(err) err.textContent = '❌ اسم المستخدم أو كلمة المرور غير صحيحة';
+  }
+}
+
+function renderDirectorPanel(){
+  var el = document.getElementById('directorContent');
+  if(!el) return;
+
+  var s = (DB && DB.settings) ? DB.settings : {};
+  var schName = s.schName || 'مدرسة حمزة بن عبد المطلب الإعدادية للبنين';
+  var sysName = s.sysName || 'نظام الرصد المدرسي الذكي';
+  var year    = s.year    || '2025 - 2026';
+
+  // ===== بناء مصفوفة الإنجاز =====
+  var teachers = DB.teachers || [];
+  var staff    = DB.staff    || [];
+  var students = DB.students || [];
+
+  // جمع كل الصفوف الفريدة
+  var allClasses = [];
+  teachers.forEach(function(t){
+    (t.classes||[]).forEach(function(c){
+      if(allClasses.indexOf(c)<0) allClasses.push(c);
+    });
+  });
+  allClasses.sort();
+
+  // بناء HTML الهيدر
+  var html = '<div style="direction:rtl;font-family:Cairo,Arial,sans-serif;padding:16px">';
+
+  // هوية المدرسة
+  html += '<div style="text-align:center;padding:16px;background:linear-gradient(135deg,#1a3a6b,#1d6fa4);color:#fff;border-radius:12px;margin-bottom:16px">';
+  html += '<div style="font-size:22px;font-weight:900;margin-bottom:4px">'+schName+'</div>';
+  html += '<div style="font-size:14px;opacity:.85">'+sysName+' &nbsp;|&nbsp; '+year+'</div>';
+  html += '<div style="font-size:13px;opacity:.7;margin-top:4px">📊 لوحة متابعة الإنجاز المباشر</div>';
+  html += '</div>';
+
+  if(!allClasses.length){
+    html += '<div style="text-align:center;padding:40px;color:#888">⏳ لا توجد بيانات بعد</div>';
+    html += '<button onclick="renderDirectorPanel()" style="margin:0 auto;display:block" class="btn sm">🔄 تحديث</button>';
+    html += '</div>';
+    el.innerHTML = html;
+    return;
+  }
+
+  // مصفوفة إنجاز المعلمين
+  html += '<div style="overflow-x:auto">';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+
+  // رأس الجدول - الصفوف
+  html += '<thead><tr>';
+  html += '<th style="background:#1a3a6b;color:#fff;padding:8px 12px;text-align:right;min-width:150px;border:1px solid #ddd">المعلم / المادة</th>';
+  allClasses.forEach(function(cls){
+    html += '<th style="background:#1a3a6b;color:#fff;padding:8px;text-align:center;border:1px solid #ddd;min-width:80px">'+cls+'</th>';
+  });
+  html += '<th style="background:#0d4a8a;color:#fff;padding:8px;text-align:center;border:1px solid #ddd;min-width:80px">الإجمالي</th>';
+  html += '</tr></thead><tbody>';
+
+  // صفوف المعلمين
+  teachers.forEach(function(t){
+    var teacherClasses = (t.classes||[]).filter(function(c){ return allClasses.indexOf(c)>=0; });
+    if(!teacherClasses.length) return;
+
+    html += '<tr>';
+    html += '<td style="padding:7px 12px;border:1px solid #e5e7eb;font-weight:700;background:#f8fafc">';
+    html += '<div>'+t.name+'</div>';
+    html += '<div style="font-size:10px;color:#6b7280">'+t.subject+'</div>';
+    html += '</td>';
+
+    var totalF=0, totalT=0;
+    allClasses.forEach(function(cls){
+      if(teacherClasses.indexOf(cls)<0){
+        html += '<td style="padding:7px;border:1px solid #e5e7eb;text-align:center;background:#f9fafb;color:#d1d5db">—</td>';
+        return;
+      }
+      var stat = compStat(false, t.username, cls);
+      var f=stat.f, tot=stat.t;
+      totalF+=f; totalT+=tot;
+      var pct = tot>0 ? Math.round((f/tot)*100) : 0;
+      var bg  = pct>=90?'#dcfce7':pct>=75?'#d1fae5':pct>=60?'#fef9c3':pct>=45?'#ffedd5':'#fee2e2';
+      var tx  = pct>=90?'#15803d':pct>=75?'#047857':pct>=60?'#92400e':pct>=45?'#c2410c':'#b91c1c';
+      html += '<td style="padding:7px;border:1px solid #e5e7eb;text-align:center;background:'+bg+';color:'+tx+';font-weight:800">';
+      html += pct+'%<div style="font-size:9px;font-weight:400">'+f+'/'+tot+'</div>';
+      html += '</td>';
+    });
+
+    var totPct = totalT>0 ? Math.round((totalF/totalT)*100) : 0;
+    var totBg  = totPct>=90?'#bbf7d0':totPct>=75?'#a7f3d0':totPct>=60?'#fef08a':totPct>=45?'#fed7aa':'#fecaca';
+    var totTx  = totPct>=90?'#14532d':totPct>=75?'#064e3b':totPct>=60?'#713f12':totPct>=45?'#7c2d12':'#7f1d1d';
+    html += '<td style="padding:7px;border:1px solid #e5e7eb;text-align:center;background:'+totBg+';color:'+totTx+';font-weight:900">';
+    html += totPct+'%</td>';
+    html += '</tr>';
+  });
+
+  // صف الإداريين
+  staff.forEach(function(sm){
+    var staffClasses = (sm.classes||[]).filter(function(c){ return allClasses.indexOf(c)>=0; });
+    if(!staffClasses.length) return;
+
+    html += '<tr>';
+    html += '<td style="padding:7px 12px;border:1px solid #e5e7eb;font-weight:700;background:#faf5ff">';
+    html += '<div>'+sm.name+'</div>';
+    html += '<div style="font-size:10px;color:#7c3aed">التقييم الإداري</div>';
+    html += '</td>';
+
+    var totalF=0, totalT=0;
+    allClasses.forEach(function(cls){
+      if(staffClasses.indexOf(cls)<0){
+        html += '<td style="padding:7px;border:1px solid #e5e7eb;text-align:center;background:#f9fafb;color:#d1d5db">—</td>';
+        return;
+      }
+      var stat = compStat(true, sm.username, cls);
+      var f=stat.f, tot=stat.t;
+      totalF+=f; totalT+=tot;
+      var pct = tot>0 ? Math.round((f/tot)*100) : 0;
+      var bg  = pct>=90?'#ede9fe':pct>=75?'#ddd6fe':pct>=60?'#fef9c3':pct>=45?'#ffedd5':'#fee2e2';
+      var tx  = pct>=90?'#4c1d95':pct>=75?'#5b21b6':pct>=60?'#92400e':pct>=45?'#c2410c':'#b91c1c';
+      html += '<td style="padding:7px;border:1px solid #e5e7eb;text-align:center;background:'+bg+';color:'+tx+';font-weight:800">';
+      html += pct+'%<div style="font-size:9px;font-weight:400">'+f+'/'+tot+'</div>';
+      html += '</td>';
+    });
+
+    var totPct = totalT>0 ? Math.round((totalF/totalT)*100) : 0;
+    html += '<td style="padding:7px;border:1px solid #e5e7eb;text-align:center;font-weight:900">'+totPct+'%</td>';
+    html += '</tr>';
+  });
+
+  // صف الإجمالي العام
+  html += '<tr style="border-top:2px solid #1a3a6b">';
+  html += '<td style="padding:8px 12px;border:1px solid #ddd;font-weight:900;background:#1a3a6b;color:#fff">الإجمالي العام</td>';
+  allClasses.forEach(function(cls){
+    var clsStudents = students.filter(function(st){ return st.class===cls; }).length;
+    var clsF=0, clsT=0;
+    teachers.forEach(function(t){
+      if((t.classes||[]).indexOf(cls)<0) return;
+      var stat = compStat(false, t.username, cls);
+      clsF+=stat.f; clsT+=stat.t;
+    });
+    staff.forEach(function(sm){
+      if((sm.classes||[]).indexOf(cls)<0) return;
+      var stat = compStat(true, sm.username, cls);
+      clsF+=stat.f; clsT+=stat.t;
+    });
+    var pct = clsT>0 ? Math.round((clsF/clsT)*100) : 0;
+    var bg  = pct>=90?'#dcfce7':pct>=75?'#d1fae5':pct>=60?'#fef9c3':pct>=45?'#ffedd5':'#fee2e2';
+    var tx  = pct>=90?'#15803d':pct>=75?'#047857':pct>=60?'#92400e':pct>=45?'#c2410c':'#b91c1c';
+    html += '<td style="padding:8px;border:1px solid #ddd;text-align:center;background:'+bg+';color:'+tx+';font-weight:900">';
+    html += pct+'%<div style="font-size:9px">'+clsStudents+' طالب</div>';
+    html += '</td>';
+  });
+  html += '<td style="padding:8px;border:1px solid #ddd;text-align:center;background:#1a3a6b;color:#fff;font-weight:900">📊</td>';
+  html += '</tr>';
+
+  html += '</tbody></table></div>';
+
+  // أزرار
+  html += '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">';
+  html += '<button class="btn sm" onclick="renderDirectorPanel()" style="background:#1d6fa4;color:#fff">🔄 تحديث</button>';
+  html += '<button class="btn sm bgl" onclick="goToRoleGateway()">🏠 الرئيسية</button>';
+  html += '</div>';
+
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 // زر الشاشة الرئيسية داخل الهيدر
@@ -1720,6 +1928,13 @@ function renderParentReport(student){
         + "</div>"
       : "";
 
+    const noteRow = (sec.note && sec.note.trim())
+      ? "<div style=\'padding:4px 8px;background:#fffbeb;border-top:1px dashed #fbbf24;display:flex;align-items:flex-start;gap:4px\'>"
+        + "<span style=\'font-size:8px;color:#92400e;font-weight:800;white-space:nowrap\'>📝 ملاحظة:</span>"
+        + "<span style=\'font-size:8px;color:#78350f;line-height:1.4\'>" + sec.note.trim() + "</span>"
+        + "</div>"
+      : "";
+
     const statusBadge = sec.status && sec.status!=="حاضر" && sec.status!=="—"
       ? "<span style='font-size:9px;background:#fee2e2;color:#991b1b;padding:2px 7px;border-radius:20px;margin-right:auto'>"+sec.status+"</span>"
       : "";
@@ -1731,6 +1946,7 @@ function renderParentReport(student){
       + "<span style='font-weight:400;opacity:.65;font-size:9px;margin-right:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px'>"+teacherNames+"</span></div>"
       + "<div class='cert-items'>"+itemsHTML+"</div>"
       + gradeRow
+      + noteRow
       + "</div>";
   }).join("");
 
@@ -1908,17 +2124,34 @@ document.addEventListener('input', function(e){
   if(e.target.classList.contains('sinp')) _colorSinp(e.target);
   if(e.target.classList.contains('ssel')) _colorSsel(e.target);
 });
+
+// إخفاء عمود الملاحظات بعد بناء الجدول
+function _hideNoteColumns(){
+  // إخفاء كل td/th يحتوي على .tinp
+  document.querySelectorAll('td:has(.tinp), th:has(.tinp)').forEach(function(el){
+    el.style.display='none';
+  });
+  // إخفاء .tinp مباشرة
+  document.querySelectorAll('.tinp').forEach(function(el){
+    var td = el.closest('td');
+    if(td) td.style.display='none';
+    else el.style.display='none';
+  });
+}
 document.addEventListener('change', function(e){
   if(e.target.classList.contains('ssel')) _colorSsel(e.target);
 });
 
 var _cObs = new MutationObserver(function(m){
-  if(m.some(function(x){return x.addedNodes.length>0;}))
+  if(m.some(function(x){return x.addedNodes.length>0;})){
     setTimeout(_colorAll,150);
+    setTimeout(_hideNoteColumns,200);
+  }
 });
 document.addEventListener('DOMContentLoaded', function(){
   _cObs.observe(document.body,{childList:true,subtree:true});
   setTimeout(_colorAll,1500);
+  setTimeout(_hideNoteColumns,1600);
 });
 
 // ===== timestamp لآخر حفظ =====
