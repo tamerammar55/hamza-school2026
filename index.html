@@ -1275,148 +1275,275 @@ function renderDirectorPanel(){
   var staff   = DB.staff||[];
   var students= DB.students||[];
 
+  function pC(p){return p>=90?'#16a34a':p>=75?'#059669':p>=60?'#ca8a04':p>=45?'#ea580c':'#dc2626';}
+  function pB(p){return p>=90?'#dcfce7':p>=75?'#d1fae5':p>=60?'#fef9c3':p>=45?'#ffedd5':'#fee2e2';}
+  function pL(p){return p>=90?'ممتاز':p>=75?'جيد جداً':p>=60?'جيد':p>=45?'مقبول':'ضعيف';}
+  function bar(p,h,col){
+    h=h||6;
+    return '<div style="background:#e2e8f0;border-radius:99px;height:'+h+'px;overflow:hidden;min-width:60px">'
+      +'<div style="background:'+col+';width:'+p+'%;height:100%;border-radius:99px"></div></div>';
+  }
+  function badge(p){
+    return '<span style="background:'+pB(p)+';color:'+pC(p)+';font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;white-space:nowrap">'+pL(p)+'</span>';
+  }
+
+  // تجميع المعلمين حسب المادة (القسم)
+  var subjects = {};
+  teachers.forEach(function(t){
+    var subj = (t.subject||'عام').trim();
+    if(!subjects[subj]) subjects[subj] = [];
+    subjects[subj].push(t);
+  });
+
+  // جمع الصفوف
   var allClasses=[];
   teachers.forEach(function(t){(t.classes||[]).forEach(function(c){if(allClasses.indexOf(c)<0)allClasses.push(c);});});
   staff.forEach(function(sm){(sm.classes||[]).forEach(function(c){if(allClasses.indexOf(c)<0)allClasses.push(c);});});
   allClasses.sort();
 
-  function pC(p){return p>=90?'#16a34a':p>=75?'#059669':p>=60?'#ca8a04':p>=45?'#ea580c':'#dc2626';}
-  function pB(p){return p>=90?'#dcfce7':p>=75?'#d1fae5':p>=60?'#fef9c3':p>=45?'#ffedd5':'#fee2e2';}
-  function pL(p){return p>=90?'ممتاز':p>=75?'جيد جداً':p>=60?'جيد':p>=45?'مقبول':'ضعيف';}
+  // إحصائيات كلية
+  var gF=0,gT=0;
+  teachers.forEach(function(t){(t.classes||[]).forEach(function(c){var st=compStat(false,t.username,c);gF+=st.f;gT+=st.t;});});
+  staff.forEach(function(sm){(sm.classes||[]).forEach(function(c){var st=compStat(true,sm.username,c);gF+=st.f;gT+=st.t;});});
+  var gP=gT>0?Math.round((gF/gT)*100):0;
 
-  // إحصائيات كل معلم
-  var tStats=[];
-  teachers.forEach(function(t){
-    var f=0,tt=0;
-    (t.classes||[]).forEach(function(cls){var st=compStat(false,t.username,cls);f+=st.f;tt+=st.t;});
-    tStats.push({name:t.name,subject:t.subject,classes:t.classes||[],f:f,t:tt,p:tt>0?Math.round((f/tt)*100):0});
-  });
-  staff.forEach(function(sm){
-    var f=0,tt=0;
-    (sm.classes||[]).forEach(function(cls){var st=compStat(true,sm.username,cls);f+=st.f;tt+=st.t;});
-    tStats.push({name:sm.name,subject:'إداري 🛡️',classes:sm.classes||[],f:f,t:tt,p:tt>0?Math.round((f/tt)*100):0,isStaff:true});
-  });
-
-  // KPIs
-  var totalF=0,totalT=0;
-  tStats.forEach(function(t){totalF+=t.f;totalT+=t.t;});
-  var totalP=totalT>0?Math.round((totalF/totalT)*100):0;
-  var done=tStats.filter(function(t){return t.p>=90;}).length;
-  var inProg=tStats.filter(function(t){return t.p>0&&t.p<90;}).length;
-  var notStarted=tStats.filter(function(t){return t.p===0;}).length;
-
-  // Pie SVG
-  function pie(p,sz){
-    sz=sz||90;var r=sz/2-6,cx=sz/2,cy=sz/2;
+  // Pie SVG مصغّر
+  function miniPie(p,sz){
+    sz=sz||70;var r=sz/2-5,cx=sz/2,cy=sz/2;
     var ang=(p/100)*360,rad=ang*Math.PI/180;
     var x2=cx+r*Math.sin(rad),y2=cy-r*Math.cos(rad),lg=ang>180?1:0;
     var col=pC(p),bg=pB(p);
     var arc=p>=100?'<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+col+'" opacity=".9"/>'
       :(p<=0?'':'<path d="M'+cx+' '+(cy-r)+' A'+r+' '+r+' 0 '+lg+' 1 '+x2+' '+y2+' L'+cx+' '+cy+' Z" fill="'+col+'" opacity=".9"/>');
-    return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 '+sz+' '+sz+'">'
+    return '<svg width="'+sz+'" height="'+sz+'" style="display:block">'
       +'<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+bg+'"/>'
       +arc
-      +'<circle cx="'+cx+'" cy="'+cy+'" r="'+(r*.6)+'" fill="white"/>'
-      +'<text x="'+cx+'" y="'+(cy+1)+'" text-anchor="middle" dominant-baseline="middle" font-size="'+(sz*.16)+'" font-weight="900" fill="'+col+'" font-family="Cairo,sans-serif">'+p+'%</text>'
+      +'<circle cx="'+cx+'" cy="'+cy+'" r="'+(r*.58)+'" fill="white"/>'
+      +'<text x="'+cx+'" y="'+(cy+1)+'" text-anchor="middle" dominant-baseline="middle" font-size="'+(sz*.18)+'" font-weight="900" fill="'+col+'" font-family="Cairo,sans-serif">'+p+'%</text>'
       +'</svg>';
   }
 
   var now=new Date().toLocaleDateString('ar-SA-u-ca-gregory',{year:'numeric',month:'long',day:'numeric'});
 
-  var h='<div style="direction:rtl;font-family:Cairo,sans-serif;background:#f1f5f9;min-height:100vh;padding:14px 16px">';
+  var h='<div style="direction:rtl;font-family:Cairo,sans-serif;background:#f1f5f9;min-height:100vh">';
 
-  // هيدر مدمج
-  h+='<div style="background:linear-gradient(135deg,#0f2544 0%,#1a3a6b 50%,#1d6fa4 100%);border-radius:14px;padding:16px 22px;margin-bottom:14px;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:12px">'
+  // ===== هيدر رئيسي =====
+  h+='<div style="background:linear-gradient(135deg,#0f2544 0%,#1a3a6b 55%,#1d6fa4 100%);padding:20px 24px 28px;position:relative;overflow:hidden">'
+    +'<div style="position:absolute;bottom:-40px;left:-40px;width:200px;height:200px;background:rgba(255,255,255,.04);border-radius:50%"></div>'
+    +'<div style="position:absolute;top:-30px;right:100px;width:150px;height:150px;background:rgba(255,255,255,.03);border-radius:50%"></div>'
+    +'<div style="position:relative;display:flex;align-items:center;justify-content:space-between;gap:16px">'
     +'<div>'
-    +'<div style="font-size:16px;font-weight:900;margin-bottom:2px">'+schName+'</div>'
-    +'<div style="font-size:10px;opacity:.75;margin-top:2px">'+sysName+' &nbsp;|&nbsp; '+year+' &nbsp;·&nbsp; 📅 '+now+'</div>'
+    +'<div style="font-size:11px;color:rgba(255,255,255,.6);margin-bottom:4px;letter-spacing:.5px">'+sysName+'</div>'
+    +'<div style="font-size:19px;font-weight:900;color:#fff;margin-bottom:3px">'+schName+'</div>'
+    +'<div style="font-size:11px;color:rgba(255,255,255,.65)">'+year+' &nbsp;·&nbsp; 📅 '+now+'</div>'
     +'</div>'
-    +'<button onclick="renderDirectorPanel()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:11px;font-weight:700;font-family:Cairo,sans-serif">🔄 تحديث</button>'
-    +'</div>';
+    +'<div style="display:flex;flex-direction:column;align-items:center;gap:4px">'
+    +miniPie(gP,90)
+    +'<div style="font-size:10px;color:rgba(255,255,255,.7)">إنجاز المدرسة</div>'
+    +'</div></div></div>';
 
-  // KPIs
-  h+='<div style="display:grid;grid-template-columns:auto 1fr;gap:12px;margin-bottom:14px;background:#fff;border-radius:14px;padding:16px;border:1px solid #e2e8f0">';
-  // Pie كبير
-  h+='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 8px">'
-    +pie(totalP,110)
-    +'<div style="font-size:10px;color:#64748b;margin-top:4px;text-align:center">الإنجاز الكلي</div>'
-    +'<div style="font-size:10px;font-weight:800;color:'+pC(totalP)+'">'+pL(totalP)+'</div>'
-    +'</div>';
-  // أرقام سريعة
-  h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-content:center">';
+  // ===== شريط KPIs =====
+  var doneT=0,inpT=0,notT=0;
+  teachers.forEach(function(t){var f=0,tt=0;(t.classes||[]).forEach(function(c){var st=compStat(false,t.username,c);f+=st.f;tt+=st.t;});var p=tt>0?Math.round((f/tt)*100):0;if(p>=90)doneT++;else if(p>0)inpT++;else notT++;});
+  staff.forEach(function(sm){var f=0,tt=0;(sm.classes||[]).forEach(function(c){var st=compStat(true,sm.username,c);f+=st.f;tt+=st.t;});var p=tt>0?Math.round((f/tt)*100):0;if(p>=90)doneT++;else if(p>0)inpT++;else notT++;});
+
+  h+='<div style="background:#fff;border-bottom:1px solid #e2e8f0;padding:10px 24px">'
+    +'<div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">';
   var kpis=[
-    {icon:'✅',val:done,label:'مكتملون',col:'#16a34a',bg:'#dcfce7'},
-    {icon:'🔄',val:inProg,label:'قيد الإنجاز',col:'#ca8a04',bg:'#fef9c3'},
-    {icon:'⏳',val:notStarted,label:'لم يبدأوا',col:'#dc2626',bg:'#fee2e2'},
-    {icon:'👥',val:students.length,label:'الطلاب',col:'#7c3aed',bg:'#faf5ff'},
-    {icon:'🏫',val:allClasses.length,label:'الصفوف',col:'#ea580c',bg:'#fff7ed'},
-    {icon:'📌',val:totalF+'/'+totalT,label:'تم رصده',col:'#1d6fa4',bg:'#eff6ff'},
+    {v:gP+'%',l:'إنجاز كلي',ic:'📊',c:pC(gP)},
+    {v:gF+'/'+gT,l:'مرصود',ic:'📌',c:'#1d6fa4'},
+    {v:students.length,l:'الطلاب',ic:'👥',c:'#7c3aed'},
+    {v:allClasses.length,l:'الصفوف',ic:'🏫',c:'#ea580c'},
+    {v:teachers.length+(staff.length?'+'+staff.length+' إداري':''),l:'المعلمون',ic:'👨‍🏫',c:'#059669'},
+    {v:doneT,l:'مكتملون',ic:'✅',c:'#16a34a'},
+    {v:inpT,l:'قيد الرصد',ic:'🔄',c:'#ca8a04'},
+    {v:notT,l:'لم يبدأوا',ic:'⏳',c:'#dc2626'},
   ];
   kpis.forEach(function(k){
-    h+='<div style="background:'+k.bg+';border-radius:10px;padding:8px;text-align:center">'
-      +'<div style="font-size:18px">'+k.icon+'</div>'
-      +'<div style="font-size:15px;font-weight:900;color:'+k.col+'">'+k.val+'</div>'
-      +'<div style="font-size:9px;color:'+k.col+';font-weight:700">'+k.label+'</div>'
-      +'</div>';
+    h+='<div style="display:flex;align-items:center;gap:6px;padding:4px 0">'
+      +'<span style="font-size:15px">'+k.ic+'</span>'
+      +'<div><div style="font-size:14px;font-weight:900;color:'+k.c+'">'+k.v+'</div>'
+      +'<div style="font-size:9px;color:#94a3b8">'+k.l+'</div></div></div>';
   });
-  h+='</div></div></div>';
-
-  // تنبيهات
-  var alerts=tStats.filter(function(t){return t.p===0;});
-  if(alerts.length){
-    h+='<div style="background:#fff5f5;border:1.5px solid #fecaca;border-radius:12px;padding:12px 16px;margin-bottom:14px">'
-      +'<div style="font-size:12px;font-weight:800;color:#dc2626;margin-bottom:8px">⚠️ لم يبدأوا الرصد بعد</div>'
-      +'<div style="display:flex;flex-wrap:wrap;gap:6px">';
-    alerts.forEach(function(t){
-      h+='<span style="background:#fee2e2;color:#b91c1c;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px">'+t.name+' — '+t.subject+'</span>';
-    });
-    h+='</div></div>';
-  }
-
-  // بطاقات المعلمين
-  h+='<div style="margin-bottom:14px">'
-    +'<div style="font-size:12px;font-weight:800;color:#1e293b;margin-bottom:10px">👨‍🏫 نسبة إنجاز الرصد</div>'
-    +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">';
-
-  tStats.sort(function(a,b){return b.p-a.p;}).forEach(function(t){
-    var col=pC(t.p),bg=pB(t.p);
-    h+='<div style="background:#fff;border-radius:12px;padding:12px 14px;border:1.5px solid '+col+'33;position:relative;overflow:hidden">'
-      +'<div style="position:absolute;top:0;right:0;width:4px;height:100%;background:'+col+'"></div>'
-      +'<div style="font-size:12px;font-weight:800;color:#1e293b;margin-bottom:1px">'+t.name+'</div>'
-      +'<div style="font-size:10px;color:#64748b;margin-bottom:8px">'+t.subject+(t.classes.length?' &nbsp;·&nbsp; '+t.classes.join(', '):'')+'</div>'
-      +'<div style="display:flex;align-items:center;gap:8px">'
-      +'<div style="flex:1;background:#e2e8f0;border-radius:99px;height:7px;overflow:hidden">'
-      +'<div style="background:'+col+';width:'+t.p+'%;height:100%;border-radius:99px"></div>'
-      +'</div>'
-      +'<span style="font-size:13px;font-weight:900;color:'+col+'">'+t.p+'%</span>'
-      +'</div>'
-      +'<div style="display:flex;justify-content:space-between;margin-top:5px">'
-      +'<span style="font-size:9px;color:#94a3b8">'+t.f+' من '+t.t+'</span>'
-      +'<span style="background:'+bg+';color:'+col+';font-size:9px;font-weight:800;padding:1px 8px;border-radius:20px">'+pL(t.p)+'</span>'
-      +'</div></div>';
-  });
+  h+='<button onclick="renderDirectorPanel()" style="margin-right:auto;background:#1d6fa4;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:11px;font-weight:700;font-family:Cairo,sans-serif">🔄 تحديث</button>';
   h+='</div></div>';
 
-  // إنجاز الصفوف
-  h+='<div style="background:#fff;border-radius:12px;padding:14px 16px;border:1px solid #e2e8f0;margin-bottom:14px">'
-    +'<div style="font-size:12px;font-weight:800;color:#1e293b;margin-bottom:12px">📚 إنجاز الصفوف</div>';
-  allClasses.forEach(function(cls){
-    var f=0,t=0;
-    teachers.forEach(function(tc){if((tc.classes||[]).indexOf(cls)<0)return;var st=compStat(false,tc.username,cls);f+=st.f;t+=st.t;});
-    staff.forEach(function(sm){if((sm.classes||[]).indexOf(cls)<0)return;var st=compStat(true,sm.username,cls);f+=st.f;t+=st.t;});
-    var p=t>0?Math.round((f/t)*100):0,col=pC(p),bg=pB(p);
-    h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px">'
-      +'<div style="font-size:11px;font-weight:700;color:#334155;min-width:60px">'+cls+'</div>'
-      +'<div style="flex:1;background:#e2e8f0;border-radius:99px;height:9px;overflow:hidden">'
-      +'<div style="background:'+col+';width:'+p+'%;height:100%;border-radius:99px"></div>'
-      +'</div>'
-      +'<span style="font-size:12px;font-weight:900;color:'+col+';min-width:38px;text-align:left">'+p+'%</span>'
-      +'<span style="background:'+bg+';color:'+col+';font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap">'+f+'/'+t+'</span>'
-      +'</div>';
-  });
-  h+='</div>';
+  h+='<div style="padding:16px 20px">';
 
-  h+='</div>';
+  // ===== تنبيه =====
+  var notStarted=[];
+  teachers.forEach(function(t){var f=0,tt=0;(t.classes||[]).forEach(function(c){var st=compStat(false,t.username,c);f+=st.f;tt+=st.t;});if(tt>0&&f===0)notStarted.push(t.name+' ('+t.subject+')');});
+  if(notStarted.length){
+    h+='<div style="background:#fff5f5;border:1.5px solid #fecaca;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:flex-start;gap:8px">'
+      +'<span style="font-size:16px">⚠️</span>'
+      +'<div><div style="font-size:11px;font-weight:800;color:#dc2626;margin-bottom:5px">لم يبدأ الرصد بعد</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:5px">';
+    notStarted.forEach(function(n){h+='<span style="background:#fee2e2;color:#b91c1c;font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px">'+n+'</span>';});
+    h+='</div></div></div>';
+  }
+
+  // ===== جداول الأقسام =====
+  var subjectKeys=Object.keys(subjects);
+
+  subjectKeys.forEach(function(subj){
+    var tList=subjects[subj];
+    // إنجاز القسم كله
+    var secF=0,secT=0;
+    tList.forEach(function(t){(t.classes||[]).forEach(function(c){var st=compStat(false,t.username,c);secF+=st.f;secT+=st.t;});});
+    var secP=secT>0?Math.round((secF/secT)*100):0;
+    var secCol=pC(secP);
+
+    h+='<div style="background:#fff;border-radius:14px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)">';
+
+    // رأس القسم
+    h+='<div style="background:linear-gradient(135deg,'+secCol+'18,'+secCol+'08);border-bottom:2px solid '+secCol+'33;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px">'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +'<div style="width:36px;height:36px;background:'+secCol+'22;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px">📚</div>'
+      +'<div>'
+      +'<div style="font-size:14px;font-weight:900;color:#1e293b">'+subj+'</div>'
+      +'<div style="font-size:10px;color:#64748b">'+tList.length+' معلم · '+secT+' رصد</div>'
+      +'</div></div>'
+      +'<div style="display:flex;align-items:center;gap:10px">'
+      +miniPie(secP,60)
+      +'<div style="text-align:center">'
+      +'<div style="font-size:11px;font-weight:700;color:#64748b">إنجاز القسم</div>'
+      +badge(secP)
+      +'</div></div></div>';
+
+    // جدول المعلمين في القسم
+    h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">';
+
+    // رأس الجدول
+    h+='<thead><tr style="background:#f8fafc;border-bottom:1.5px solid #e2e8f0">'
+      +'<th style="padding:8px 14px;text-align:right;font-weight:700;color:#475569;min-width:130px">المعلم</th>';
+    allClasses.forEach(function(cls){
+      h+='<th style="padding:8px 10px;text-align:center;font-weight:700;color:#475569;min-width:85px">'+cls+'</th>';
+    });
+    h+='<th style="padding:8px 10px;text-align:center;font-weight:700;color:#1d6fa4;min-width:90px">إنجاز المعلم</th>'
+      +'</tr></thead><tbody>';
+
+    // صفوف المعلمين
+    tList.forEach(function(t,ti){
+      var rowBg=ti%2===0?'#fff':'#fafafa';
+      var tF=0,tT=0;
+      h+='<tr style="background:'+rowBg+';border-bottom:1px solid #f1f5f9">'
+        +'<td style="padding:8px 14px">'
+        +'<div style="font-weight:700;color:#1e293b">'+t.name+'</div>'
+        +'<div style="font-size:9px;color:#94a3b8">'+(t.classes||[]).join(' · ')+'</div>'
+        +'</td>';
+
+      allClasses.forEach(function(cls){
+        if((t.classes||[]).indexOf(cls)<0){
+          h+='<td style="padding:8px 10px;text-align:center;color:#e2e8f0;font-size:11px">—</td>';
+          return;
+        }
+        var st=compStat(false,t.username,cls);
+        tF+=st.f; tT+=st.t;
+        var p=st.t>0?Math.round((st.f/st.t)*100):0;
+        var col=pC(p),bg=pB(p);
+        h+='<td style="padding:6px 10px;text-align:center">'
+          +'<div style="display:flex;flex-direction:column;align-items:center;gap:3px">'
+          +'<span style="font-size:12px;font-weight:900;color:'+col+'">'+p+'%</span>'
+          +bar(p,5,col)
+          +'<span style="font-size:8px;color:#94a3b8">'+st.f+'/'+st.t+'</span>'
+          +'</div></td>';
+      });
+
+      // إنجاز المعلم الكلي
+      var totP=tT>0?Math.round((tF/tT)*100):0;
+      var totCol=pC(totP);
+      h+='<td style="padding:6px 10px;text-align:center;background:'+pB(totP)+'">'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:3px">'
+        +'<span style="font-size:13px;font-weight:900;color:'+totCol+'">'+totP+'%</span>'
+        +bar(totP,6,totCol)
+        +badge(totP)
+        +'</div></td>';
+      h+='</tr>';
+    });
+
+    // صف إنجاز الصف (إجمالي القسم لكل صف)
+    h+='<tr style="background:'+pB(secP)+'22;border-top:1.5px solid '+pC(secP)+'33">'
+      +'<td style="padding:8px 14px;font-weight:800;color:'+pC(secP)+'">إنجاز الصف</td>';
+    allClasses.forEach(function(cls){
+      var f=0,t=0;
+      tList.forEach(function(tc){if((tc.classes||[]).indexOf(cls)<0)return;var st=compStat(false,tc.username,cls);f+=st.f;t+=st.t;});
+      var p=t>0?Math.round((f/t)*100):0;
+      var col=pC(p);
+      h+='<td style="padding:6px 10px;text-align:center">'
+        +'<span style="font-size:12px;font-weight:900;color:'+col+'">'+p+'%</span>'
+        +'</td>';
+    });
+    h+='<td style="padding:6px 10px;text-align:center">'
+      +'<span style="font-size:13px;font-weight:900;color:'+pC(secP)+'">'+secP+'%</span>'
+      +'</td></tr>';
+
+    h+='</tbody></table></div></div>';
+  });
+
+  // ===== قسم الإداريين =====
+  if(staff.length){
+    var admF=0,admT=0;
+    staff.forEach(function(sm){(sm.classes||[]).forEach(function(c){var st=compStat(true,sm.username,c);admF+=st.f;admT+=st.t;});});
+    var admP=admT>0?Math.round((admF/admT)*100):0;
+    var admCol=pC(admP);
+
+    h+='<div style="background:#fff;border-radius:14px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)">';
+    h+='<div style="background:linear-gradient(135deg,#7c3aed18,#7c3aed08);border-bottom:2px solid #7c3aed33;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px">'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +'<div style="width:36px;height:36px;background:#7c3aed22;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px">🛡️</div>'
+      +'<div><div style="font-size:14px;font-weight:900;color:#7c3aed">التقييم الإداري</div>'
+      +'<div style="font-size:10px;color:#64748b">'+staff.length+' إداري · '+admT+' رصد</div>'
+      +'</div></div>'
+      +'<div style="display:flex;align-items:center;gap:10px">'
+      +miniPie(admP,60)
+      +'<div style="text-align:center">'
+      +'<div style="font-size:11px;font-weight:700;color:#64748b">إنجاز القسم</div>'
+      +badge(admP)
+      +'</div></div></div>';
+
+    h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">';
+    h+='<thead><tr style="background:#f8fafc;border-bottom:1.5px solid #e2e8f0">'
+      +'<th style="padding:8px 14px;text-align:right;font-weight:700;color:#475569">الإداري</th>';
+    allClasses.forEach(function(cls){h+='<th style="padding:8px 10px;text-align:center;font-weight:700;color:#475569;min-width:85px">'+cls+'</th>';});
+    h+='<th style="padding:8px 10px;text-align:center;font-weight:700;color:#7c3aed;min-width:90px">إنجاز الإداري</th></tr></thead><tbody>';
+
+    staff.forEach(function(sm,si){
+      var sF=0,sT=0;
+      h+='<tr style="background:'+(si%2===0?'#fff':'#fafafa')+';border-bottom:1px solid #f1f5f9">'
+        +'<td style="padding:8px 14px"><div style="font-weight:700;color:#7c3aed">'+sm.name+'</div>'
+        +'<div style="font-size:9px;color:#94a3b8">'+(sm.classes||[]).join(' · ')+'</div></td>';
+      allClasses.forEach(function(cls){
+        if((sm.classes||[]).indexOf(cls)<0){h+='<td style="padding:8px 10px;text-align:center;color:#e2e8f0">—</td>';return;}
+        var st=compStat(true,sm.username,cls);
+        sF+=st.f;sT+=st.t;
+        var p=st.t>0?Math.round((st.f/st.t)*100):0,col=pC(p);
+        h+='<td style="padding:6px 10px;text-align:center">'
+          +'<div style="display:flex;flex-direction:column;align-items:center;gap:3px">'
+          +'<span style="font-size:12px;font-weight:900;color:'+col+'">'+p+'%</span>'
+          +bar(p,5,col)
+          +'<span style="font-size:8px;color:#94a3b8">'+st.f+'/'+st.t+'</span>'
+          +'</div></td>';
+      });
+      var tP=sT>0?Math.round((sF/sT)*100):0,tCol=pC(tP);
+      h+='<td style="padding:6px 10px;text-align:center;background:'+pB(tP)+'">'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:3px">'
+        +'<span style="font-size:13px;font-weight:900;color:'+tCol+'">'+tP+'%</span>'
+        +bar(tP,6,tCol)+badge(tP)+'</div></td></tr>';
+    });
+    // صف إجمالي صفوف
+    h+='<tr style="background:#7c3aed11;border-top:1.5px solid #7c3aed33">'
+      +'<td style="padding:8px 14px;font-weight:800;color:#7c3aed">إنجاز الصف</td>';
+    allClasses.forEach(function(cls){
+      var f=0,t=0;
+      staff.forEach(function(sm){if((sm.classes||[]).indexOf(cls)<0)return;var st=compStat(true,sm.username,cls);f+=st.f;t+=st.t;});
+      var p=t>0?Math.round((f/t)*100):0;
+      h+='<td style="padding:6px 10px;text-align:center"><span style="font-size:12px;font-weight:900;color:'+pC(p)+'">'+p+'%</span></td>';
+    });
+    h+='<td style="padding:6px 10px;text-align:center"><span style="font-size:13px;font-weight:900;color:'+admCol+'">'+admP+'%</span></td></tr>';
+    h+='</tbody></table></div></div>';
+  }
+
+  h+='</div></div>';
   el.innerHTML=h;
 }
 
