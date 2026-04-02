@@ -2166,6 +2166,70 @@ setTimeout(function(){
   }
 }, 2000);
 
+// ===== إصلاح مسح الرصد =====
+// نُضيف wrapper لـ confirmClearRecords يضمن التصفير الكامل
+window._wasCleared = false;
+setTimeout(function(){
+  var _origClear = window.confirmClearRecords;
+  if(typeof _origClear !== "function") return;
+
+  window.confirmClearRecords = function(){
+    // نُشغّل المسح الأصلي
+    _origClear.apply(this, arguments);
+
+    // نضع flag لمنع إعادة تحميل البيانات
+    window._wasCleared = true;
+
+    // تصفير فوري شامل
+    REC = {};
+    try{ localStorage.removeItem('r3_records'); }catch(e){}
+    try{ localStorage.setItem('r3_records', '{}'); }catch(e){}
+    try{ localStorage.removeItem('r3_r3_records'); }catch(e){}
+
+    // إيقاف الـ listener مؤقتاً
+    if(typeof _recListener === "function"){
+      try{ _recListener(); }catch(e){}
+      window._recListener = null;
+    }
+
+    // تسجيل الخروج وإعادة التوجيه للبوابة بعد اكتمال المسح
+    setTimeout(function(){
+      // تسجيل خروج المسؤول
+      if(typeof ALO === "function") ALO();
+      // العودة للبوابة الرئيسية
+      if(typeof goToRoleGateway === "function") goToRoleGateway();
+      // إظهار رسالة
+      if(typeof toast === "function") toast("✅ تم مسح الرصد — يرجى تسجيل الدخول مجدداً", "ok");
+      // إعادة تشغيل listener
+      window._wasCleared = false;
+      if(typeof startRecordsListener === "function") startRecordsListener();
+    }, 2000);
+  };
+  console.log("✅ confirmClearRecords wrapped");
+}, 3000);
+
+// ===== إصلاح refreshFromCloud - لا يُعيد REC بعد المسح =====
+setTimeout(function(){
+  var _origRefresh = window.refreshFromCloud;
+  if(typeof _origRefresh !== "function") return;
+
+  window.refreshFromCloud = async function(){
+    // حفظ REC الحالي قبل التحديث
+    var _curREC = {};
+    try{ _curREC = JSON.parse(JSON.stringify(REC)); }catch(e){ _curREC = REC; }
+
+    // استدعاء الأصلي
+    await _origRefresh.apply(this, arguments);
+
+    // إذا كان قد تم مسح الرصد مؤخراً → لا نُعيد البيانات القديمة
+    if(window._wasCleared){
+      REC = {};
+      try{ localStorage.setItem('r3_records','{}'); }catch(e){}
+    }
+  };
+  console.log("✅ refreshFromCloud wrapped for clear");
+}, 4000);
+
 </script>
 
 </body>
