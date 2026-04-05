@@ -2257,10 +2257,7 @@ setTimeout(function(){
 }, 2000);
 
 // =====================================================
-// نظام الحفظ - v4 - الحل النهائي
-// المشكلة: records document ضخم جداً
-// الحل: حفظ بيانات الصف الحالي فقط (وليس كل REC)
-// + قراءة صحيحة عند التحديث
+// نظام الحفظ - v5
 // =====================================================
 
 window.debounceSave = function(){
@@ -2268,8 +2265,6 @@ window.debounceSave = function(){
   _updateSaveBtnState();
 };
 
-// الحفظ: نحفظ بيانات الصف الحالي فقط
-// مفتاح: t_username_class → نحفظ في data[class]
 function manualSave(){
   var _db = typeof _fbDB==="function" ? _fbDB() : null;
   if(!_db){ if(typeof toast==="function") toast("❌ لا يوجد اتصال","err"); return; }
@@ -2288,7 +2283,6 @@ function manualSave(){
   }
   if(!_username){ if(typeof toast==="function") toast("⚠️ يُرجى تسجيل الدخول",""); return; }
 
-  // جمع بيانات هذا المعلم
   var _myData={}, _plen=_prefix.length;
   Object.keys(REC).forEach(function(k){
     if(k.indexOf(_prefix)===0) _myData[k.substring(_plen)]=REC[k];
@@ -2306,25 +2300,22 @@ function manualSave(){
       window._unsavedChanges=false;
       _updateSaveBtnState();
       if(typeof setSyncOk==="function") setSyncOk();
-      if(typeof toast==="function") toast("✅ تم حفظ الرصد","ok");
-      console.log("✅ Saved:",_docId,Object.keys(_myData).length,"classes");
+      if(typeof toast==="function") toast("✅ تم الحفظ: "+Object.keys(_myData).length+" صف","ok");
       setTimeout(function(){ window._blockListener=false; },2000);
     }).catch(function(e){
       window._blockListener=false;
-      console.error("Save:",e.code,e.message);
       if(e.code==="permission-denied"||e.code==="unauthenticated"){
         if(typeof firebase!=="undefined")
           firebase.auth().signInAnonymously().then(function(){setTimeout(manualSave,1500);});
       } else {
         if(typeof setSyncErr==="function") setSyncErr();
-        if(typeof toast==="function") toast("❌ فشل الحفظ: "+e.message,"err");
+        if(typeof toast==="function") toast("❌ فشل: "+e.code+" - "+e.message,"err");
       }
     });
 }
 
 window._manualSaveReady = function(){ manualSave(); };
 
-// autoFill + TL/SL + selCls
 setTimeout(function(){
   var _oAF=window.autoFill;
   if(typeof _oAF==="function") window.autoFill=function(isStaff){
@@ -2349,8 +2340,7 @@ setTimeout(function(){
   };
 },1500);
 
-// refreshFromCloud: الحل الصحيح
-// يقرأ كل البيانات ويدمجها بأولوية صحيحة
+// refreshFromCloud مع toast تشخيصي
 window.refreshFromCloud = async function(){
   toast("⏳ جاري جلب البيانات...",""); setSyncSaving();
   var _isAdmin=typeof ST_!=="undefined"&&ST_.adminAuth;
@@ -2359,93 +2349,60 @@ window.refreshFromCloud = async function(){
   var _db=typeof _fbDB==="function"?_fbDB():null;
   if(!_db){setSyncErr();toast("❌ لا يوجد اتصال","err");return;}
 
-  // نحفظ مفاتيح المعلم الحالي (غير محفوظة)
   var _mp=null, _mk={};
   if(_isTch) _mp="t_"+ST_.teacher.username+"_";
   if(_isSt)  _mp="s_"+ST_.staff.username+"_";
   if(_mp) Object.keys(REC).forEach(function(k){if(k.indexOf(_mp)===0)_mk[k]=REC[k];});
 
-  // وقف listener تماماً
   window._blockListener=true;
   if(typeof _recListener==="function"){try{_recListener();}catch(e){}}
   window._recListener=null;
 
   try{
     var _snap=await _db.collection("rasid").get();
-
-    // نبدأ بـ records القديم كأساس
-    var _base={};
-    // ثم نطبق rec_* الجديدة فوقه
-    var _newREC={};
+    var _base={}, _newREC={};
 
     _snap.forEach(function(doc){
       if(!doc.exists) return;
-      var _r=doc.data(); if(!_r) return;
-      var _id=doc.id;
-
-      // النظام الجديد: rec_t_username (كل صفوف معلم)
+      var _r=doc.data(); if(!_r) return; var _id=doc.id;
       if(_id.indexOf("rec_")===0 && _r.prefix && _r.data){
-        Object.keys(_r.data).forEach(function(cls){
-          _newREC[_r.prefix+cls]=_r.data[cls];
-        });
+        Object.keys(_r.data).forEach(function(cls){ _newREC[_r.prefix+cls]=_r.data[cls]; });
         return;
       }
-      // النظام القديم: records (كل المعلمين)
-      if(_id==="records"){
-        var _d=_r.data;
-        if(_d && typeof _d==="object") Object.assign(_base, _d);
-        return;
-      }
-      // النظام القديم: rec_t_username_class (صف واحد)
-      if(_id.indexOf("rec_")===0 && _r.rkey && _r.data!==undefined){
-        _base[_r.rkey]=_r.data;
-        return;
-      }
-
-      // بيانات أخرى
+      if(_id==="records"){ var _d=_r.data; if(_d&&typeof _d==="object") Object.assign(_base,_d); return; }
+      if(_id.indexOf("rec_")===0 && _r.rkey && _r.data!==undefined){ _base[_r.rkey]=_r.data; return; }
       var _v=_r.data!==undefined?_r.data:_r; if(!_v) return;
-      if(_id==="students")      DB.students      =_v;
-      else if(_id==="teachers") DB.teachers      =_v;
-      else if(_id==="staff")    DB.staff         =_v;
-      else if(_id==="settings") DB.settings      =_v;
-      else if(_id==="teacher_items")  DB.teacher_items  =_v;
-      else if(_id==="admin_items")    DB.admin_items    =_v;
-      else if(_id==="physical_items") DB.physical_items =_v;
+      if(_id==="students") DB.students=_v;
+      else if(_id==="teachers") DB.teachers=_v;
+      else if(_id==="staff") DB.staff=_v;
+      else if(_id==="settings") DB.settings=_v;
+      else if(_id==="teacher_items") DB.teacher_items=_v;
+      else if(_id==="admin_items") DB.admin_items=_v;
+      else if(_id==="physical_items") DB.physical_items=_v;
     });
 
-    // دمج: _base (القديم) أولاً → _newREC (الجديد) يتغلب
     var _final={};
-    Object.assign(_final, _base);
-    Object.assign(_final, _newREC);
+    Object.assign(_final,_base);    // قديم
+    Object.assign(_final,_newREC);  // جديد يتغلب
 
-    console.log("Base(old):",Object.keys(_base).length,
-                "| New:",Object.keys(_newREC).length,
-                "| Final:",Object.keys(_final).length);
+    // toast تشخيصي يظهر الأرقام
+    toast("📊 قديم:"+Object.keys(_base).length+" جديد:"+Object.keys(_newREC).length+" إجمالي:"+Object.keys(_final).length,"");
 
-    if(_isAdmin){
-      REC = _final;
-    } else {
-      // المعلم: Firebase + مفاتيحه الحالية فوقها
-      REC = {};
-      Object.assign(REC, _final);
-      Object.assign(REC, _mk);
-    }
+    if(_isAdmin){ REC=_final; }
+    else { REC={}; Object.assign(REC,_final); Object.assign(REC,_mk); }
     try{localStorage.setItem("r3_records",JSON.stringify(REC));}catch(e){}
 
   }catch(e){
-    console.error("refresh:",e);
-    setSyncErr(); toast("❌ خطأ في التحديث","err");
+    setSyncErr(); toast("❌ خطأ: "+e.message,"err");
     window._blockListener=false; return;
   }
 
   renderAdminPanel(); renderFilesTab();
-  if(_isAdmin){
-    var el=document.getElementById("lastSync");
-    if(el) el.textContent=new Date().toLocaleTimeString("ar");
-  }
+  if(_isAdmin){ var el=document.getElementById("lastSync"); if(el) el.textContent=new Date().toLocaleTimeString("ar"); }
   if(typeof ST_!=="undefined"&&ST_.teacher){buildCBs(ST_.teacher.classes||[],"tCBts",false);if(ST_.tClass)renderTable(false);}
   if(typeof ST_!=="undefined"&&ST_.staff){buildCBs(ST_.staff.classes||[],"sCBts",true);if(ST_.sClass)renderTable(true);}
-  setSyncOk();
+
+  setTimeout(function(){setSyncOk();},100);
   toast("✅ تم التحديث — "+Object.keys(REC).length+" سجل","ok");
   setTimeout(function(){
     window._blockListener=false;
@@ -2480,29 +2437,23 @@ function _updateSaveBtnState(){
 })();
 
 function importRecordsFromFile(file){
-  if(!file) return;
-  var _db=typeof _fbDB==="function"?_fbDB():null;
-  if(!_db){toast("❌ لا يوجد اتصال","err");return;}
-  var reader=new FileReader();
-  reader.onload=function(e){
+  if(!file)return;
+  var _db=typeof _fbDB==="function"?_fbDB():null;if(!_db){toast("❌ لا يوجد اتصال","err");return;}
+  var reader=new FileReader();reader.onload=function(e){
     try{
-      var _d=JSON.parse(e.target.result);
-      var _u=_d.username, _t=_d.type==="staff"?"s_":"t_";
-      var _p=_t+_u+"_", _r=_d.records||{};
+      var _d=JSON.parse(e.target.result),_u=_d.username,_t=_d.type==="staff"?"s_":"t_";
+      var _p=_t+_u+"_",_r=_d.records||{};
       if(!_u||!Object.keys(_r).length){toast("⚠️ ملف فارغ","");return;}
       Object.keys(_r).forEach(function(cls){REC[_p+cls]=_r[cls];});
       _db.collection("rasid").doc("rec_"+_t+_u.replace(/[/.]/g,"_"))
         .set({username:_u,prefix:_p,data:_r,ts:Date.now()})
         .then(function(){
           try{localStorage.setItem("r3_records",JSON.stringify(REC));}catch(ex){}
-          renderAdminPanel();
-          toast("✅ تم رفع رصد "+(_d.name||_u)+" ("+Object.keys(_r).length+" صف)","ok");
+          renderAdminPanel();toast("✅ تم رفع رصد "+(_d.name||_u)+" ("+Object.keys(_r).length+" صف)","ok");
         }).catch(function(err){toast("❌ فشل: "+err.message,"err");});
     }catch(ex){toast("❌ خطأ في الملف","err");}
-  };
-  reader.readAsText(file,"utf-8");
+  };reader.readAsText(file,"utf-8");
 }
-console.log("✅ Save system v4 ready");
 </script>
 
 </body>
