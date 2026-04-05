@@ -869,10 +869,21 @@ async function refreshFromCloud(){
   toast("⏳ جاري جلب البيانات من السحابة...","");
   setSyncSaving();
 
-  // تحميل من Firebase — يُحدِّث DB و REC مباشرة
+  // حفظ REC الحالي قبل التحديث
+  var _localREC = {};
+  try{ _localREC = JSON.parse(JSON.stringify(REC)); }catch(e){ _localREC = REC || {}; }
+
+  // تحميل من Firebase
   await loadAllFromFB();
 
-  // إعادة تشغيل المستمعات لضمان الاتصال
+  // دمج: Firebase (أساس) + REC المحلي (يتغلب - التغييرات الجديدة)
+  var _merged = {};
+  Object.keys(REC).forEach(function(k){ _merged[k] = REC[k]; });
+  Object.keys(_localREC).forEach(function(k){ _merged[k] = _localREC[k]; });
+  REC = _merged;
+  try{ localStorage.setItem("r3_records", JSON.stringify(REC)); }catch(e){}
+
+  // إعادة تشغيل المستمعات
   startRecordsListener();
   startSettingsListener();
 
@@ -2236,9 +2247,18 @@ window._unsavedChanges = false;
 // نُعطّل debounceSave ونستبدله بتتبع التغييرات فقط
 setTimeout(function(){
   // استبدال debounceSave بتسجيل التغييرات فقط
+  // الحفظ التلقائي كل 30 ثانية بعد آخر تغيير
+  var _autoSaveTimer = null;
   window.debounceSave = function(){
     window._unsavedChanges = true;
     _updateSaveIndicator();
+    // إلغاء timer السابق وبدء جديد
+    clearTimeout(_autoSaveTimer);
+    _autoSaveTimer = setTimeout(function(){
+      if(window._unsavedChanges){
+        manualSave();
+      }
+    }, 30000); // 30 ثانية
   };
 
   // حماية autoFill - تُحفظ مباشرة بـ saveREC، نحمي من listener
