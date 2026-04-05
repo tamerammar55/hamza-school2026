@@ -92,16 +92,28 @@ window._checkLockBeforeLogin = function(){
 };
 setTimeout(window._checkLockBeforeLogin, 2000);
 // تسجيل anonymous auth لضمان إذن الكتابة للمعلمين والإداريين
-setTimeout(function(){
+// تفعيل Anonymous Auth مع إعادة محاولة
+(function tryAuth(){
   try{
     var _a = firebase.auth();
-    if(_a && !_a.currentUser){
-      _a.signInAnonymously().catch(function(e){
-        console.warn("anon auth:", e.code);
-      });
-    }
-  }catch(e){}
-}, 1500);
+    _a.onAuthStateChanged(function(user){
+      if(user){
+        window._authReady = true;
+        console.log("✅ Auth OK:", user.isAnonymous ? "anonymous" : user.email);
+      } else {
+        _a.signInAnonymously()
+          .then(function(){ window._authReady = true; })
+          .catch(function(e){
+            console.warn("anon auth failed:", e.code, "- retrying in 3s");
+            // إعادة المحاولة بعد 3 ثوانٍ
+            setTimeout(function(){
+              _a.signInAnonymously().catch(function(){});
+            }, 3000);
+          });
+      }
+    });
+  }catch(e){ console.error("auth init:", e); }
+})();
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -977,7 +989,9 @@ async function refreshFromCloud(){
   }
 
   setSyncOk();
-  toast("✅ تم تحديث البيانات","ok");
+  var _recCount = Object.keys(REC).length;
+  toast("✅ تم التحديث — " + _recCount + " سجل رصد","ok");
+  console.log("✅ DONE - REC:", _recCount, "teachers:", DB.teachers?DB.teachers.length:0);
 
   // رفع الحظر وإعادة listener بعد اكتمال التحديث
   setTimeout(function(){
