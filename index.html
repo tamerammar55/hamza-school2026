@@ -927,22 +927,39 @@ async function refreshFromCloud(){
       if(!doc.exists) return;
       var _raw = doc.data();
       if(!_raw) return;
-      // البيانات مخزنة في حقل data
-      var _d = _raw.data !== undefined ? _raw.data : _raw;
-      if(!_d) return;
-      if(doc.id==="records"){
-        _fbREC = _d;
-        console.log("📦 records doc found:", Object.keys(_fbREC).length, "keys");
+      var _id = doc.id;
+
+      // documents الرصد الجديدة: rec_t_username_class
+      if(_id.indexOf("rec_")=== 0){
+        var _rkey = _raw.rkey;
+        var _rdata = _raw.data;
+        if(_rkey && _rdata !== undefined){
+          _fbREC[_rkey] = _rdata;
+        }
+        return;
       }
-      else if(doc.id==="students")  DB.students  = _d;
-      else if(doc.id==="teachers")  DB.teachers  = _d;
-      else if(doc.id==="staff")     DB.staff     = _d;
-      else if(doc.id==="settings")  DB.settings  = _d;
-      else if(doc.id==="teacher_items")  DB.teacher_items  = _d;
-      else if(doc.id==="admin_items")    DB.admin_items    = _d;
-      else if(doc.id==="physical_items") DB.physical_items = _d;
+
+      // document الرصد القديم (للتوافق مع البيانات السابقة)
+      if(_id==="records"){
+        var _d = _raw.data !== undefined ? _raw.data : _raw;
+        if(_d && typeof _d==="object"){
+          Object.keys(_d).forEach(function(k){ _fbREC[k]=_d[k]; });
+        }
+        console.log("📦 legacy records doc:", Object.keys(_fbREC).length, "keys");
+        return;
+      }
+
+      var _d2 = _raw.data !== undefined ? _raw.data : _raw;
+      if(!_d2) return;
+      if(_id==="students")       DB.students       = _d2;
+      else if(_id==="teachers")  DB.teachers       = _d2;
+      else if(_id==="staff")     DB.staff          = _d2;
+      else if(_id==="settings")  DB.settings       = _d2;
+      else if(_id==="teacher_items")  DB.teacher_items  = _d2;
+      else if(_id==="admin_items")    DB.admin_items    = _d2;
+      else if(_id==="physical_items") DB.physical_items = _d2;
     });
-    console.log("📊 after forEach - _fbREC keys:", Object.keys(_fbREC).length);
+    console.log("📊 Total REC keys:", Object.keys(_fbREC).length);
 
     console.log("📥 Firebase REC keys:", Object.keys(_fbREC).length);
     // بناء REC حسب نوع المستخدم
@@ -2500,29 +2517,26 @@ function manualSave(){
   if(typeof setSyncSaving==="function") setSyncSaving();
   if(typeof toast==="function") toast("⏳ جاري الحفظ...","");
 
-  var _docRef = _db.collection("rasid").doc("records");
+  // حفظ كل صف في document منفصل: rasid/rec_t_username_class
+  // هذا يتجنب حد Firestore للـ document الواحد
+  var _promises = [];
+  var _savedCount = 0;
 
-  // الحل: استخدام runTransaction لضمان الدمج الصحيح
-  // بدون "data.key" notation التي تكسر المفاتيح التي تحتوي نقاط
-  _db.runTransaction(function(tx){
-    return tx.get(_docRef).then(function(snap){
-      var _existing = {};
-      if(snap.exists && snap.data() && snap.data().data){
-        _existing = snap.data().data;
-      }
-      // دمج: بيانات Firebase + بيانات هذا المعلم (تتغلب)
-      var _merged = {};
-      Object.keys(_existing).forEach(function(k){ _merged[k]=_existing[k]; });
-      Object.keys(_myKeys).forEach(function(k){ _merged[k]=_myKeys[k]; });
-      tx.set(_docRef, { data: _merged });
-      return _merged;
-    });
-  }).then(function(_saved){
+  Object.keys(_myKeys).forEach(function(rkey){
+    // rkey مثل: t_username_classname
+    var _docId = "rec_" + rkey.replace(/\//g, "_").replace(/\./g, "_");
+    var _docRef = _db.collection("rasid").doc(_docId);
+    var _p = _docRef.set({ data: _myKeys[rkey], rkey: rkey, ts: Date.now() })
+      .then(function(){ _savedCount++; });
+    _promises.push(_p);
+  });
+
+  Promise.all(_promises).then(function(){
     window._unsavedChanges = false;
     _updateSaveIndicator();
     if(typeof setSyncOk==="function") setSyncOk();
-    if(typeof toast==="function") toast("✅ تم حفظ الرصد","ok");
-    console.log("✅ manualSave OK - keys:", Object.keys(_saved).length);
+    if(typeof toast==="function") toast("✅ تم حفظ الرصد ("+_savedCount+" صف)","ok");
+    console.log("✅ manualSave OK:", _savedCount, "docs saved");
   }).catch(function(e){
     console.error("manualSave error:", e.code, e.message);
     if(e.code==="permission-denied"||e.code==="unauthenticated"){
