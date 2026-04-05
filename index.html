@@ -2386,7 +2386,10 @@ window.refreshFromCloud = async function(){
     Object.assign(_final,_newREC);  // جديد يتغلب
 
     // toast تشخيصي يظهر الأرقام
-    toast("📊 قديم:"+Object.keys(_base).length+" جديد:"+Object.keys(_newREC).length+" إجمالي:"+Object.keys(_final).length,"");
+    toast("📊 قديم:"+Object.keys(_base).length+" | جديد:"+Object.keys(_newREC).length+" | إجمالي:"+Object.keys(_final).length,"");
+    // sample key
+    var _sampleKey = Object.keys(_final)[0]||"لا يوجد";
+    setTimeout(function(){ toast("🔑 مثال: "+_sampleKey,""); },1500);
 
     if(_isAdmin){ REC=_final; }
     else { REC={}; Object.assign(REC,_final); Object.assign(REC,_mk); }
@@ -2398,6 +2401,15 @@ window.refreshFromCloud = async function(){
   }
 
   renderAdminPanel(); renderFilesTab();
+  // تشخيص: compStat أول معلم
+  if(typeof DB!=="undefined" && DB.teachers && DB.teachers[0] && DB.teachers[0].classes && DB.teachers[0].classes[0]){
+    var _t0=DB.teachers[0], _c0=_t0.classes[0];
+    var _rk="t_"+_t0.username+"_"+_c0;
+    var _hasKey = !!REC[_rk];
+    setTimeout(function(){
+      toast("🧮 "+_t0.name.substring(0,10)+" | صف:"+_c0+" | مفتاح موجود:"+(_hasKey?"نعم✅":"لا❌"),"");
+    },3000);
+  }
   if(_isAdmin){ var el=document.getElementById("lastSync"); if(el) el.textContent=new Date().toLocaleTimeString("ar"); }
   if(typeof ST_!=="undefined"&&ST_.teacher){buildCBs(ST_.teacher.classes||[],"tCBts",false);if(ST_.tClass)renderTable(false);}
   if(typeof ST_!=="undefined"&&ST_.staff){buildCBs(ST_.staff.classes||[],"sCBts",true);if(ST_.sClass)renderTable(true);}
