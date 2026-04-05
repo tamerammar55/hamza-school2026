@@ -869,19 +869,37 @@ async function refreshFromCloud(){
   toast("⏳ جاري جلب البيانات من السحابة...","");
   setSyncSaving();
 
-  // حفظ REC الحالي قبل التحديث
-  var _localREC = {};
-  try{ _localREC = JSON.parse(JSON.stringify(REC)); }catch(e){ _localREC = REC || {}; }
+  // تحديد من يطلب التحديث
+  var _isAdmin  = ST_ && ST_.adminAuth;
+  var _isTeacher = ST_ && ST_.teacher && ST_.teacher.username;
+  var _isStaff   = ST_ && ST_.staff   && ST_.staff.username;
 
-  // تحميل من Firebase
-  await loadAllFromFB();
+  if(_isAdmin){
+    // لوحة الإدارة: تحميل كل شيء من Firebase بدون دمج
+    await loadAllFromFB();
 
-  // دمج: Firebase (أساس) + REC المحلي (يتغلب - التغييرات الجديدة)
-  var _merged = {};
-  Object.keys(REC).forEach(function(k){ _merged[k] = REC[k]; });
-  Object.keys(_localREC).forEach(function(k){ _merged[k] = _localREC[k]; });
-  REC = _merged;
-  try{ localStorage.setItem("r3_records", JSON.stringify(REC)); }catch(e){}
+  } else {
+    // معلم/إداري: احتفظ ببياناته، وحدّث DB فقط من Firebase
+    var _myREC = {};
+    try{ _myREC = JSON.parse(JSON.stringify(REC)); }catch(e){ _myREC = {}; }
+
+    await loadAllFromFB(); // يُحدّث REC بالكامل من Firebase
+
+    // أعد بيانات هذا المعلم لحماية تغييراته غير المحفوظة
+    if(_isTeacher){
+      var _tu = ST_.teacher.username;
+      Object.keys(_myREC).forEach(function(k){
+        if(k.indexOf("t_"+_tu+"_") === 0) REC[k] = _myREC[k];
+      });
+    }
+    if(_isStaff){
+      var _su = ST_.staff.username;
+      Object.keys(_myREC).forEach(function(k){
+        if(k.indexOf("s_"+_su+"_") === 0) REC[k] = _myREC[k];
+      });
+    }
+    try{ localStorage.setItem("r3_records", JSON.stringify(REC)); }catch(e){}
+  }
 
   // إعادة تشغيل المستمعات
   startRecordsListener();
@@ -891,7 +909,7 @@ async function refreshFromCloud(){
   renderAdminPanel();
   renderFilesTab();
 
-  if(ST_.adminAuth){
+  if(_isAdmin){
     const el = document.getElementById("lastSync");
     if(el) el.textContent = new Date().toLocaleTimeString("ar");
   }
