@@ -2230,6 +2230,138 @@ setTimeout(function(){
   console.log("✅ refreshFromCloud wrapped for clear");
 }, 4000);
 
+// ===== إيقاف الحفظ التلقائي + الحفظ اليدوي =====
+window._unsavedChanges = false;
+
+// نُعطّل debounceSave ونستبدله بتتبع التغييرات فقط
+setTimeout(function(){
+  // استبدال debounceSave بتسجيل التغييرات فقط
+  window.debounceSave = function(){
+    window._unsavedChanges = true;
+    // تحديث مؤشر الحفظ
+    _updateSaveIndicator();
+  };
+
+  // wrapper لـ selCls للتحذير عند الانتقال بدون حفظ
+  var _origSelCls = window.selCls;
+  if(typeof _origSelCls === "function"){
+    window.selCls = function(cls, isStaff){
+      if(window._unsavedChanges){
+        // إظهار تحذير
+        var curCls = isStaff ? (window.ST_ && window.ST_.sClass) : (window.ST_ && window.ST_.tClass);
+        if(curCls && curCls !== cls){
+          if(!confirm("⚠️ لم يتم حفظ بيانات الرصد للصف الحالي!\n\nهل تريد الانتقال بدون حفظ؟\n(سيتم فقدان التغييرات)")){
+            return; // إلغاء الانتقال
+          }
+          // المعلم اختار الانتقال بدون حفظ
+          window._unsavedChanges = false;
+          _updateSaveIndicator();
+        }
+      }
+      _origSelCls.apply(this, arguments);
+    };
+    console.log("✅ selCls wrapped with unsaved check");
+  }
+}, 3500);
+
+// دالة تحديث مؤشر الحفظ
+function _updateSaveIndicator(){
+  var btn = document.getElementById('manualSaveBtn');
+  var ind = document.getElementById('unsavedIndicator');
+  if(btn){
+    if(window._unsavedChanges){
+      btn.style.background = '#dc2626';
+      btn.style.animation = 'pulse 1.5s infinite';
+      btn.textContent = '💾 حفظ الرصد *';
+    } else {
+      btn.style.background = '#16a34a';
+      btn.style.animation = '';
+      btn.textContent = '✅ تم الحفظ';
+      setTimeout(function(){
+        if(!window._unsavedChanges && btn){
+          btn.textContent = '💾 حفظ الرصد';
+          btn.style.background = '#1d6fa4';
+        }
+      }, 2000);
+    }
+  }
+  if(ind){
+    ind.style.display = window._unsavedChanges ? 'inline' : 'none';
+  }
+}
+
+// دالة الحفظ اليدوي
+function manualSave(isStaff){
+  if(typeof saveREC === "function"){
+    saveREC();
+    window._unsavedChanges = false;
+    _updateSaveIndicator();
+    if(typeof toast === "function") toast("✅ تم حفظ الرصد بنجاح", "ok");
+  }
+}
+
+// CSS لنبضة الزر
+(function(){
+  var style = document.createElement('style');
+  style.textContent = '@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}} #manualSaveBtn{transition:background .3s}';
+  document.head.appendChild(style);
+})();
+
+// إضافة زر الحفظ في جدول الرصد بعد بناء الجدول
+var _saveObserver = new MutationObserver(function(mutations){
+  mutations.forEach(function(m){
+    m.addedNodes.forEach(function(node){
+      if(node.nodeType === 1){
+        // نبحث عن جدول الرصد ونضيف زر الحفظ
+        var tbl = node.querySelector && node.querySelector('.rasid-table, table.rtbl');
+        if(!tbl) tbl = (node.classList && (node.classList.contains('rasid-table') || node.classList.contains('rtbl'))) ? node : null;
+        if(tbl && !document.getElementById('manualSaveBtn')){
+          _injectSaveBtn();
+        }
+      }
+    });
+  });
+});
+
+function _injectSaveBtn(){
+  if(document.getElementById('manualSaveBtn')) return;
+  
+  // نجد منطقة أزرار التعبئة أو رأس الجدول
+  var target = document.getElementById('tContent') || document.getElementById('sContent');
+  if(!target) return;
+  
+  // البحث عن div الأزرار الموجود
+  var btnsArea = target.querySelector('.comp-bar, .tbl-hdr, [class*="comp"]');
+  if(!btnsArea) btnsArea = target;
+  
+  // إنشاء زر الحفظ
+  var saveDiv = document.createElement('div');
+  saveDiv.style.cssText = 'display:flex;align-items:center;gap:8px;margin:8px 0;padding:6px 12px;background:#f0f9ff;border-radius:8px;border:1px solid #bfdbfe;direction:rtl';
+  saveDiv.innerHTML = 
+    '<button id="manualSaveBtn" onclick="manualSave(typeof ST_!=='undefined'&&!!ST_.staff)" style="background:#1d6fa4;color:#fff;border:none;border-radius:8px;padding:7px 18px;cursor:pointer;font-size:13px;font-weight:800;font-family:Cairo,sans-serif">💾 حفظ الرصد</button>' +
+    '<span id="unsavedIndicator" style="display:none;color:#dc2626;font-size:12px;font-weight:700;animation:pulse 1s infinite">● تغييرات غير محفوظة</span>' +
+    '<span style="font-size:11px;color:#64748b">احرص على الحفظ قبل الانتقال لصف آخر</span>';
+  
+  // نُضيف في بداية target
+  target.insertBefore(saveDiv, target.firstChild);
+}
+
+// مراقبة تغييرات DOM لإضافة الزر عند ظهور الجدول
+document.addEventListener('DOMContentLoaded', function(){
+  _saveObserver.observe(document.body, {childList: true, subtree: true});
+});
+
+// إعادة ضبط _unsavedChanges عند تغيير الصف
+document.addEventListener('click', function(e){
+  var btn = e.target.closest && e.target.closest('.cb-t, .cb-s, [class*="cb-"]');
+  if(btn && !window._unsavedChanges){
+    window._unsavedChanges = false;
+    _updateSaveIndicator();
+  }
+});
+
+
+
 </script>
 
 </body>
