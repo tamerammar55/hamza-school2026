@@ -873,45 +873,94 @@ async function refreshFromCloud(){
   var _isStaff   = typeof ST_!=="undefined" && ST_.staff   && ST_.staff.username;
   var _db = typeof _fbDB==="function" ? _fbDB() : null;
   if(!_db){ setSyncErr(); toast("❌ لا يوجد اتصال","err"); return; }
+
+  // حفظ مفاتيح المعلم الحالي
   var _myKeys = {};
   if(_isTeacher){ var _tu=ST_.teacher.username; Object.keys(REC).forEach(function(k){ if(k.indexOf("t_"+_tu+"_")===0) _myKeys[k]=REC[k]; }); }
-  if(_isStaff){ var _su=ST_.staff.username; Object.keys(REC).forEach(function(k){ if(k.indexOf("s_"+_su+"_")===0) _myKeys[k]=REC[k]; }); }
+  if(_isStaff){   var _su=ST_.staff.username;   Object.keys(REC).forEach(function(k){ if(k.indexOf("s_"+_su+"_")===0) _myKeys[k]=REC[k]; }); }
+
   window._blockListener = true;
   if(typeof _recListener==="function"){ try{_recListener();}catch(e){} }
   window._recListener = null;
+
   try{
     var _allSnap = await _db.collection("rasid").get();
-    var _fbREC = {};
+
+    // نفصل القراءة: أولاً records القديم، ثم rec_* تتغلب
+    var _legacyREC = {};
+    var _newREC    = {};
+    var _otherDocs = {};
+
     _allSnap.forEach(function(doc){
       if(!doc.exists) return;
       var _raw=doc.data(); if(!_raw) return;
       var _id=doc.id;
-      if(_id.indexOf("rec_")===0){ if(_raw.rkey&&_raw.data!==undefined) _fbREC[_raw.rkey]=_raw.data; return; }
-      if(_id==="records"){ var _d=_raw.data; if(_d&&typeof _d==="object") Object.keys(_d).forEach(function(k){if(!_fbREC[k])_fbREC[k]=_d[k];}); return; }
+
+      if(_id==="records"){
+        // البيانات القديمة - أولوية منخفضة
+        var _d=_raw.data;
+        if(_d && typeof _d==="object") Object.assign(_legacyREC, _d);
+        return;
+      }
+      if(_id.indexOf("rec_")===0){
+        // بيانات جديدة - أولوية عالية (تتغلب على القديم)
+        if(_raw.rkey && _raw.data!==undefined) _newREC[_raw.rkey]=_raw.data;
+        return;
+      }
+      // بيانات أخرى
       var _d2=_raw.data!==undefined?_raw.data:_raw; if(!_d2) return;
-      if(_id==="students") DB.students=_d2;
-      else if(_id==="teachers") DB.teachers=_d2;
-      else if(_id==="staff") DB.staff=_d2;
-      else if(_id==="settings") DB.settings=_d2;
-      else if(_id==="teacher_items") DB.teacher_items=_d2;
-      else if(_id==="admin_items") DB.admin_items=_d2;
-      else if(_id==="physical_items") DB.physical_items=_d2;
+      if(_id==="students")       DB.students       =_d2;
+      else if(_id==="teachers")  DB.teachers       =_d2;
+      else if(_id==="staff")     DB.staff          =_d2;
+      else if(_id==="settings")  DB.settings       =_d2;
+      else if(_id==="teacher_items")  DB.teacher_items  =_d2;
+      else if(_id==="admin_items")    DB.admin_items    =_d2;
+      else if(_id==="physical_items") DB.physical_items =_d2;
     });
-    console.log("Firebase REC keys:", Object.keys(_fbREC).length);
-    if(_isAdmin){ REC=_fbREC; }
-    else { REC={}; Object.keys(_fbREC).forEach(function(k){REC[k]=_fbREC[k];}); Object.keys(_myKeys).forEach(function(k){REC[k]=_myKeys[k];}); }
+
+    // دمج: القديم أولاً ثم الجديد يتغلب
+    var _fbREC = {};
+    Object.assign(_fbREC, _legacyREC);  // القديم
+    Object.assign(_fbREC, _newREC);     // الجديد يكتب فوقه
+
+    console.log("Legacy REC:", Object.keys(_legacyREC).length,
+                "| New rec_ docs:", Object.keys(_newREC).length,
+                "| Total:", Object.keys(_fbREC).length);
+
+    if(_isAdmin){
+      REC = _fbREC;
+    } else {
+      // المعلم: Firebase + مفاتيحه المحلية فوقها
+      REC = {};
+      Object.assign(REC, _fbREC);
+      Object.assign(REC, _myKeys);
+    }
     try{ localStorage.setItem("r3_records",JSON.stringify(REC)); }catch(e){}
+
   }catch(e){
-    console.error("refresh:",e); setSyncErr(); toast("❌ خطأ","err");
+    console.error("refresh:",e);
+    setSyncErr(); toast("❌ خطأ في التحديث","err");
     window._blockListener=false; return;
   }
+
   renderAdminPanel(); renderFilesTab();
-  if(_isAdmin){ var el=document.getElementById("lastSync"); if(el) el.textContent=new Date().toLocaleTimeString("ar"); }
+  if(_isAdmin){
+    var el=document.getElementById("lastSync");
+    if(el) el.textContent=new Date().toLocaleTimeString("ar");
+  }
   if(typeof ST_!=="undefined"&&ST_.teacher){ buildCBs(ST_.teacher.classes||[],"tCBts",false); if(ST_.tClass) renderTable(false); }
-  if(typeof ST_!=="undefined"&&ST_.staff){ buildCBs(ST_.staff.classes||[],"sCBts",true); if(ST_.sClass) renderTable(true); }
-  setSyncOk(); toast("✅ تم التحديث — "+Object.keys(REC).length+" سجل","ok");
-  setTimeout(function(){ window._blockListener=false; if(typeof startRecordsListener==="function") startRecordsListener(); if(typeof startSettingsListener==="function") startSettingsListener(); },2000);
+  if(typeof ST_!=="undefined"&&ST_.staff){   buildCBs(ST_.staff.classes||[],"sCBts",true);  if(ST_.sClass) renderTable(true); }
+
+  setSyncOk();
+  toast("✅ تم التحديث — "+Object.keys(REC).length+" سجل","ok");
+
+  setTimeout(function(){
+    window._blockListener=false;
+    if(typeof startRecordsListener==="function") startRecordsListener();
+    if(typeof startSettingsListener==="function") startSettingsListener();
+  }, 2000);
 }
+
 async function dirRefreshData(){
   var btn=document.getElementById("dirRefreshBtn");
   if(btn){btn.disabled=true;btn.textContent="⏳...";}
