@@ -3,170 +3,143 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام الرصد - مدرسة حمزة بن عبد المطلب</title>
+    <title>لوحة المسئول - مدرسة حمزة بن عبد المطلب</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap">
     
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
 
+    <style>
+        :root { --primary: #1d6fa4; --secondary: #27ae60; --bg: #f4f7f6; }
+        body { font-family: 'Cairo', sans-serif; background-color: var(--bg); margin: 0; padding: 20px; direction: rtl; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; }
+        .header img { width: 120px; margin-bottom: 15px; }
+        h2 { color: #333; font-weight: 800; margin-bottom: 5px; }
+        p.subtitle { color: #666; margin-bottom: 30px; }
+        
+        .btn-group { display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; }
+        .btn { border: none; border-radius: 10px; padding: 12px 25px; cursor: pointer; font-family: 'Cairo'; font-weight: 700; font-size: 15px; transition: all 0.3s; color: white; display: flex; align-items: center; gap: 8px; }
+        .btn-save { background-color: var(--primary); }
+        .btn-import { background-color: var(--secondary); }
+        .btn:hover { opacity: 0.9; transform: translateY(-2px); }
+        
+        #status-msg { margin-top: 15px; font-weight: bold; min-height: 25px; border-radius: 8px; padding: 5px; }
+        .data-card { border-top: 2px solid #eee; margin-top: 20px; padding-top: 20px; text-align: right; }
+    </style>
+
     <script>
-        // ===================== إعدادات مشروك الخاصة =====================
+        // إعدادات Firebase الخاصة بك
         const firebaseConfig = {
             apiKey: "AIzaSyCKIAk_ww2IDSDpGdBoHwiJi8Wa5PULCoI",
             authDomain: "school-hamza-system.firebaseapp.com",
             projectId: "school-hamza-system",
             storageBucket: "school-hamza-system.firebasestorage.app",
             messagingSenderId: "554602860079",
-            appId: "1:554602860079:web:e530c2b170d7493ac180da",
-            measurementId: "G-6V63VRCXH3"
+            appId: "1:554602860079:web:e530c2b170d7493ac180da"
         };
 
-        // تهيئة Firebase
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
-        let REC = {}; // المتغير المحلي لحفظ السجلات
+        let REC = {}; // مخزن البيانات
 
-        // ===================== وظائف الحماية والاستدعاء =====================
-
-        // 1. جلب البيانات فور تحميل الصفحة (لمنع تصفير البيانات)
-        function loadRemoteData() {
+        // 1. جلب البيانات تلقائياً فور التحميل
+        async function loadData() {
             const user = localStorage.getItem("_lastUser");
             const type = localStorage.getItem("_lastType") === "staff" ? "s_" : "t_";
-            
             if (!user) return;
 
             const docId = "rec_" + type + user.replace(/[/.]/g, "_");
-
-            db.collection("rasid").doc(docId).get().then((doc) => {
+            try {
+                const doc = await db.collection("rasid").doc(docId).get();
                 if (doc.exists) {
-                    const cloudData = doc.data().records || {};
-                    // دمج البيانات السحابية مع المحلية لضمان عدم الضياع
-                    REC = Object.assign({}, cloudData, REC);
-                    toast("🔄 تم مزامنة البيانات من السحابة", "ok");
-                    if (typeof renderTable === "function") renderTable();
+                    REC = doc.data().records || {};
+                    toast("🔄 تم مزامنة آخر نسخة محفوظة من السحابة", "ok");
+                    renderPreview();
                 }
-            }).catch(err => console.error("خطأ في الجلب:", err));
+            } catch (e) { console.error(e); }
         }
 
-        // 2. دالة الحفظ الذكي (تستخدم merge لمنع المسح)
-        function manualSave() {
+        // 2. دالة الحفظ (تستخدم Merge لضمان عدم المسح)
+        async function manualSave() {
             const user = localStorage.getItem("_lastUser");
             const type = localStorage.getItem("_lastType") === "staff" ? "s_" : "t_";
             
-            if (!user) {
-                toast("⚠️ خطأ: لم يتم التعرف على المستخدم", "err");
-                return;
-            }
-
-            if (Object.keys(REC).length === 0) {
-                toast("⚠️ لا توجد بيانات جديدة لحفظها", "");
-                return;
-            }
+            if (!user) { toast("⚠️ يرجى تسجيل الدخول أولاً", "err"); return; }
+            if (Object.keys(REC).length === 0) { toast("⚠️ لا توجد بيانات لحفظها", "err"); return; }
 
             const docId = "rec_" + type + user.replace(/[/.]/g, "_");
+            toast("⏳ جاري الحفظ...", "ok");
 
             db.collection("rasid").doc(docId).set({
                 username: user,
                 records: REC,
                 lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true }) // <--- ضمان عدم مسح البيانات السابقة
-            .then(() => {
-                toast("✅ تم الحفظ في السحابة بنجاح", "ok");
-            })
-            .catch((error) => {
-                toast("❌ فشل الحفظ: " + error.message, "err");
-            });
+            }, { merge: true }) // حماية البيانات من المسح
+            .then(() => toast("✅ تم الحفظ بنجاح في قاعدة البيانات", "ok"))
+            .catch(e => toast("❌ فشل الحفظ: " + e.message, "err"));
         }
 
-        // 3. دالة الاستيراد والمزامنة الفورية
-        function importRecordsFromFile(file) {
+        // 3. دالة الاستيراد من ملف
+        function handleImport(file) {
             if (!file) return;
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
                     const data = JSON.parse(e.target.result);
-                    const u = data.username;
-                    const t = data.type === "staff" ? "s_" : "t_";
-                    const r = data.records || {};
-
-                    if (!u) { toast("⚠️ ملف غير صالح", "err"); return; }
-
-                    REC = Object.assign(REC, r); // دمج الملف مع البيانات الحالية
-
-                    const docId = "rec_" + t + u.replace(/[/.]/g, "_");
-                    db.collection("rasid").doc(docId).set({
-                        username: u,
-                        records: REC,
-                        last_import: new Date().toISOString()
-                    }, { merge: true })
-                    .then(() => {
-                        toast("✅ تم الاستيراد بنجاح", "ok");
-                        if (typeof renderTable === "function") renderTable();
-                    });
-                } catch (err) {
-                    toast("❌ خطأ في قراءة الملف", "err");
-                }
+                    if (data.records) {
+                        REC = Object.assign(REC, data.records);
+                        toast("✅ تم استيراد البيانات من الملف بنجاح", "ok");
+                        renderPreview();
+                    }
+                } catch (err) { toast("❌ خطأ في تنسيق الملف", "err"); }
             };
             reader.readAsText(file);
         }
 
-        // تشغيل المزامنة عند فتح الصفحة
-        window.onload = loadRemoteData;
-
-        function toast(m, type) {
+        function toast(m, t) {
             const s = document.getElementById("status-msg");
-            if(s) {
-                s.textContent = m;
-                s.style.color = type === "err" ? "#ff4d4d" : "#2ecc71";
-                setTimeout(() => s.textContent = "", 3000);
-            }
+            s.textContent = m;
+            s.style.backgroundColor = t === "err" ? "#fee" : "#efe";
+            s.style.color = t === "err" ? "#c0392b" : "#27ae60";
         }
 
-        // تسجيل الدخول المجهول لضمان الصلاحيات
-        firebase.auth().signInAnonymously().catch(e => console.error("Auth:", e));
+        function renderPreview() {
+            const container = document.getElementById("preview");
+            const count = Object.keys(REC).length;
+            container.innerHTML = `<p>عدد الصفوف المسجلة حالياً: <strong>${count}</strong></p>`;
+        }
 
+        window.onload = loadData;
+        firebase.auth().signInAnonymously();
     </script>
-
-    <style>
-        body { font-family: 'Cairo', sans-serif; background: #f4f7f6; direction: rtl; padding: 20px; }
-        .admin-panel { background: #fff; max-width: 800px; margin: auto; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; }
-        .btn-group { margin-top: 20px; display: flex; justify-content: center; gap: 10px; }
-        .btn { background: #1d6fa4; color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        .btn:hover { background: #155a8a; transform: translateY(-2px); }
-        .btn-import { background: #27ae60; }
-        #status-msg { margin-top: 15px; font-weight: bold; min-height: 24px; }
-    </style>
 </head>
 <body>
 
-<div class="admin-panel">
-    <img src="https://upload.wikimedia.org/wikipedia/ar/thumb/4/41/Qatar_Test_Logo.svg/1200px-Qatar_Test_Logo.svg.png" width="100" alt="Logo">
-    <h2>لوحة مسئول الرصد الإلكتروني</h2>
-    <p>مدرسة حمزة بن عبد المطلب الإعدادية للبنين</p>
-    
+<div class="container">
+    <div class="header">
+        <img src="https://upload.wikimedia.org/wikipedia/ar/thumb/4/41/Qatar_Test_Logo.svg/1200px-Qatar_Test_Logo.svg.png" alt="Logo">
+        <h2>لوحة المسئول - نظام الرصد الإلكتروني</h2>
+        <p class="subtitle">مدرسة حمزة بن عبد المطلب الإعدادية للبنين</p>
+    </div>
+
     <div id="status-msg"></div>
 
     <div class="btn-group">
-        <button class="btn" onclick="manualSave()">💾 حفظ التغييرات سحابياً</button>
-        <button class="btn btn-import" onclick="document.getElementById('fileIn').click()">📥 استيراد ملف رصد</button>
-        <input type="file" id="fileIn" style="display:none" onchange="importRecordsFromFile(this.files[0])">
+        <button class="btn btn-save" onclick="manualSave()">
+            <span>💾</span> حفظ الرصد سحابياً
+        </button>
+        
+        <button class="btn btn-import" onclick="document.getElementById('fileInput').click()">
+            <span>📥</span> استيراد ملف رصد جديد
+        </button>
+        <input type="file" id="fileInput" style="display:none" onchange="handleImport(this.files[0])">
     </div>
 
-    <div id="table-container" style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
-        </div>
+    <div class="data-card" id="preview">
+        <p>جاري فحص المزامنة مع السحابة...</p>
+    </div>
 </div>
-
-<script>
-    // دالة تجريبية لعرض البيانات (يمكنك استبدالها بدالتك الأصلية renderTable)
-    function renderTable() {
-        const container = document.getElementById("table-container");
-        if (Object.keys(REC).length > 0) {
-            container.innerHTML = "<h3>سجلات الرصد الحالية محملة وجاهزة</h3>";
-        }
-    }
-</script>
 
 </body>
 </html>
