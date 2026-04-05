@@ -967,9 +967,24 @@ async function refreshFromCloud(){
     return;
   }
 
-  console.log("🔍 DB.teachers:", DB.teachers ? DB.teachers.length : 0,
-    "students:", DB.students ? DB.students.length : 0,
-    "REC keys:", Object.keys(REC).length);
+  var _dbLog_t = DB.teachers ? DB.teachers.length : 0;
+  var _dbLog_s = DB.students ? DB.students.length : 0;
+  var _dbLog_r = Object.keys(REC).length;
+  console.log("🔍 DB.teachers:", _dbLog_t, "students:", _dbLog_s, "REC keys:", _dbLog_r);
+
+  // debug: نعرض أول 3 مفاتيح من REC
+  var _recKeys = Object.keys(REC).slice(0,3);
+  console.log("🔑 Sample REC keys:", _recKeys);
+
+  // debug: نختبر compStat لأول معلم
+  if(DB.teachers && DB.teachers[0] && DB.teachers[0].classes && DB.teachers[0].classes[0]){
+    var _t0 = DB.teachers[0];
+    var _c0 = _t0.classes[0];
+    var _stat = (typeof compStat==="function") ? compStat(false, _t0.username, _c0) : null;
+    console.log("🧮 compStat test:", _t0.name, _c0, "→", _stat ? _stat.f+"/"+_stat.t : "compStat not found");
+    console.log("🔑 Expected key:", "t_"+_t0.username+"_"+_c0);
+    console.log("📋 REC has key:", REC["t_"+_t0.username+"_"+_c0] ? "YES ✅" : "NO ❌");
+  }
 
   // تحديث الواجهة أولاً
   renderAdminPanel();
