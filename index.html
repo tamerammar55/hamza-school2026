@@ -344,15 +344,19 @@ tbody td:nth-child(2){text-align:right}
 // ========== حماية المشروع ==========
 (function(){
 
-  // 1. منع النقر اليمين
-  document.addEventListener('contextmenu', function(e){ e.preventDefault(); return false; });
+  // 1. منع النقر اليمين (إلا لمسؤول النظام)
+  document.addEventListener('contextmenu', function(e){
+    if(window._adminUnlocked) return;
+    e.preventDefault(); return false;
+  });
 
   // 2. منع تحديد النص
   document.addEventListener('selectstart', function(e){ e.preventDefault(); return false; });
   document.onselectstart = function(){ return false; };
 
-  // 3. منع اختصارات المطور
+  // 3. منع اختصارات المطور (إلا لمسؤول النظام)
   document.addEventListener('keydown', function(e){
+    if(window._adminUnlocked) return; // مسؤول النظام مسموح له
     // F12
     if(e.keyCode === 123){ e.preventDefault(); return false; }
     // Ctrl+Shift+I / Ctrl+Shift+J / Ctrl+Shift+C
@@ -384,12 +388,18 @@ tbody td:nth-child(2){text-align:right}
   }
   setInterval(detectDevTools, 1000);
 
-  // 5. إخفاء رسائل Console
+  // 5. إخفاء رسائل Console (إلا لمسؤول النظام)
   try{
     var _noop = function(){};
-    console.log = _noop; console.warn = _noop;
-    console.error = _noop; console.info = _noop;
-    console.debug = _noop;
+    var _origLog   = console.log.bind(console);
+    var _origWarn  = console.warn.bind(console);
+    var _origError = console.error.bind(console);
+    function _isAdminUnlocked(){ return !!window._adminUnlocked; }
+    console.log   = function(){ if(_isAdminUnlocked()) _origLog.apply(console,arguments); };
+    console.warn  = function(){ if(_isAdminUnlocked()) _origWarn.apply(console,arguments); };
+    console.error = function(){ if(_isAdminUnlocked()) _origError.apply(console,arguments); };
+    console.info  = console.log;
+    console.debug = console.log;
   }catch(e){}
 
   // 7. منع Drag
@@ -866,21 +876,18 @@ async function doChangePwd(){
 <script>
 // ===================== REFRESH FROM CLOUD =====================
 async function refreshFromCloud(){
-  toast("⏳ جاري جلب البيانات من السحابة...","");
+  toast("⏳ جاري جلب البيانات...","");
   setSyncSaving();
+  console.log("🔄 refreshFromCloud START - REC keys:", Object.keys(REC).length);
 
   var _isAdmin   = ST_ && ST_.adminAuth;
   var _isTeacher = ST_ && ST_.teacher && ST_.teacher.username;
   var _isStaff   = ST_ && ST_.staff   && ST_.staff.username;
   var _db = typeof _fbDB==="function" ? _fbDB() : null;
 
-  if(!_db){
-    setSyncErr();
-    toast("❌ لا يوجد اتصال","err");
-    return;
-  }
+  if(!_db){ setSyncErr(); toast("❌ لا يوجد اتصال","err"); return; }
 
-  // حفظ بيانات هذا المعلم قبل أي تحديث
+  // حفظ مفاتيح المعلم الحالي (تغييراته غير المحفوظة)
   var _myKeys = {};
   if(_isTeacher){
     var _tu = ST_.teacher.username;
@@ -895,35 +902,45 @@ async function refreshFromCloud(){
     });
   }
 
-  // حظر listener أثناء التحديث
+  // حظر listener كاملاً أثناء التحديث
   window._blockListener = true;
   if(typeof _recListener==="function"){ try{_recListener();}catch(e){} }
   window._recListener = null;
 
   try{
-    // قراءة واحدة مباشرة من Firebase
-    var _recSnap = await _db.collection("rasid").doc("records").get();
-    var _fbREC = {};
-    if(_recSnap.exists && _recSnap.data() && _recSnap.data().data){
-      _fbREC = _recSnap.data().data;
-    }
-
-    // تحديث DB (بيانات المعلمين والطلاب والإعدادات)
+    // قراءة كل الـ collection دفعة واحدة (atomic)
     var _allSnap = await _db.collection("rasid").get();
-    _allSnap.forEach(function(doc){
-      var _d = doc.data() && doc.data().data;
-      if(!_d) return;
-      if(doc.id==="students")  DB.students=_d;
-      else if(doc.id==="teachers") DB.teachers=_d;
-      else if(doc.id==="staff")    DB.staff=_d;
-      else if(doc.id==="settings") DB.settings=_d;
-    });
+    var _fbREC = {};
 
+    _allSnap.forEach(function(doc){
+      if(!doc.exists) return;
+      var _raw = doc.data();
+      if(!_raw) return;
+      // البيانات مخزنة في حقل data
+      var _d = _raw.data !== undefined ? _raw.data : _raw;
+      if(!_d) return;
+      if(doc.id==="records"){
+        _fbREC = _d;
+        console.log("📦 records doc found:", Object.keys(_fbREC).length, "keys");
+      }
+      else if(doc.id==="students")  DB.students  = _d;
+      else if(doc.id==="teachers")  DB.teachers  = _d;
+      else if(doc.id==="staff")     DB.staff     = _d;
+      else if(doc.id==="settings")  DB.settings  = _d;
+      else if(doc.id==="teacher_items")  DB.teacher_items  = _d;
+      else if(doc.id==="admin_items")    DB.admin_items    = _d;
+      else if(doc.id==="physical_items") DB.physical_items = _d;
+    });
+    console.log("📊 after forEach - _fbREC keys:", Object.keys(_fbREC).length);
+
+    console.log("📥 Firebase REC keys:", Object.keys(_fbREC).length);
+    // بناء REC حسب نوع المستخدم
     if(_isAdmin){
-      // الإدارة: خذ Firebase كما هو
+      // الإدارة: Firebase مباشرة بدون تعديل
       REC = _fbREC;
+      console.log("✅ Admin REC set:", Object.keys(REC).length, "keys");
     } else {
-      // المعلم: Firebase أساس + بياناته المحلية (تغييراته غير المحفوظة) فوقها
+      // معلم/إداري: Firebase + مفاتيحه المحلية (تغييراته غير المحفوظة)
       REC = {};
       Object.keys(_fbREC).forEach(function(k){ REC[k]=_fbREC[k]; });
       Object.keys(_myKeys).forEach(function(k){ REC[k]=_myKeys[k]; });
@@ -933,17 +950,13 @@ async function refreshFromCloud(){
 
   }catch(e){
     console.error("refresh error:", e);
+    setSyncErr();
     toast("❌ خطأ في التحديث","err");
+    window._blockListener = false;
+    return;
   }
 
-  // رفع حظر listener بعد ثانية
-  setTimeout(function(){
-    window._blockListener = false;
-    if(typeof startRecordsListener==="function") startRecordsListener();
-    if(typeof startSettingsListener==="function") startSettingsListener();
-  }, 1500);
-
-  // تحديث الواجهة
+  // تحديث الواجهة أولاً
   renderAdminPanel();
   renderFilesTab();
 
@@ -962,6 +975,13 @@ async function refreshFromCloud(){
 
   setSyncOk();
   toast("✅ تم تحديث البيانات","ok");
+
+  // رفع الحظر وإعادة listener بعد اكتمال التحديث
+  setTimeout(function(){
+    window._blockListener = false;
+    if(typeof startRecordsListener==="function") startRecordsListener();
+    if(typeof startSettingsListener==="function") startSettingsListener();
+  }, 2000);
 }
 </script>
 
