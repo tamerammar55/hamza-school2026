@@ -2257,14 +2257,20 @@ setTimeout(function(){
   var _origSelCls = window.selCls;
   if(typeof _origSelCls === "function"){
     window.selCls = function(cls, isStaff){
-      if(window._unsavedChanges){
-        // إظهار تحذير
-        var curCls = isStaff ? (window.ST_ && window.ST_.sClass) : (window.ST_ && window.ST_.tClass);
+      // التحقق فقط إذا كان المعلم/الإداري مسجلاً ولديه صف محدد مسبقاً
+      var _teacher = window.ST_ && window.ST_.teacher;
+      var _staff   = window.ST_ && window.ST_.staff;
+      var _isLoggedIn = isStaff ? !!_staff : !!_teacher;
+
+      if(window._unsavedChanges && _isLoggedIn){
+        var curCls = isStaff
+          ? (window.ST_ && window.ST_.sClass)
+          : (window.ST_ && window.ST_.tClass);
+        // فقط إذا كان هناك صف محدد مسبقاً وهو مختلف عن الجديد
         if(curCls && curCls !== cls){
-          if(!confirm("⚠️ لم يتم حفظ بيانات الرصد للصف الحالي!\n\nهل تريد الانتقال بدون حفظ؟\n(سيتم فقدان التغييرات)")){
+          if(!confirm("⚠️ لم يتم حفظ بيانات الرصد للصف: " + curCls + "\n\nهل تريد الانتقال لـ " + cls + " بدون حفظ؟")){
             return; // إلغاء الانتقال
           }
-          // المعلم اختار الانتقال بدون حفظ
           window._unsavedChanges = false;
           _updateSaveIndicator();
         }
@@ -2273,6 +2279,23 @@ setTimeout(function(){
     };
     console.log("✅ selCls wrapped with unsaved check");
   }
+
+  // تصفير _unsavedChanges عند كل دخول جديد (TL/SL)
+  var _origTL = window.TL;
+  var _origSL = window.SL;
+  if(typeof _origTL === "function"){
+    window.TL = function(){
+      window._unsavedChanges = false;
+      _origTL.apply(this, arguments);
+    };
+  }
+  if(typeof _origSL === "function"){
+    window.SL = function(){
+      window._unsavedChanges = false;
+      _origSL.apply(this, arguments);
+    };
+  }
+  console.log("✅ TL/SL unsaved flag reset on login");
 }, 3500);
 
 // دالة تحديث مؤشر الحفظ
