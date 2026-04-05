@@ -2356,6 +2356,347 @@ function importRecordsFromFile(file){
   reader.readAsText(file,"utf-8");
 }
 console.log("Save system ready");
+
+
+// ============================================================
+// نظام الحفظ الآمن النهائي
+// كل معلم له document خاص في Firebase
+// rasid/rec_t_{username} يحتوي كل صفوفه
+// ============================================================
+
+window._saveSystem = (function(){
+  var _saving = false;
+  var _pendingSave = false;
+  var _blockListener = false;
+
+  // الحفظ الرئيسي
+  function save(callback){
+    if(_saving){
+      // هناك حفظ جارٍ، نضع علامة للحفظ بعده
+      _pendingSave = true;
+      return;
+    }
+
+    var _db = typeof _fbDB==="function" ? _fbDB() : null;
+    if(!_db){
+      if(typeof toast==="function") toast("❌ لا يوجد اتصال بقاعدة البيانات","err");
+      return;
+    }
+
+    // تحديد مفاتيح هذا المعلم
+    var _username = null;
+    var _prefix   = null;
+    var _docId    = null;
+
+    if(typeof ST_!=="undefined"){
+      if(ST_.teacher && ST_.teacher.username){
+        _username = ST_.teacher.username;
+        _prefix   = "t_" + _username + "_";
+        _docId    = "rec_t_" + _username.replace(/[/.]/g,"_");
+      } else if(ST_.staff && ST_.staff.username){
+        _username = ST_.staff.username;
+        _prefix   = "s_" + _username + "_";
+        _docId    = "rec_s_" + _username.replace(/[/.]/g,"_");
+      }
+    }
+
+    if(!_username || !_docId){
+      if(typeof toast==="function") toast("⚠️ يُرجى تسجيل الدخول أولاً","");
+      return;
+    }
+
+    // جمع بيانات هذا المعلم من REC
+    // الـ key يكون "t_username_class" ونحفظ القيمة مع class كـ key
+    var _myData = {};
+    var _prefix_len = _prefix.length;
+    Object.keys(REC).forEach(function(k){
+      if(k.indexOf(_prefix)===0){
+        var _cls = k.substring(_prefix_len); // اسم الصف فقط
+        _myData[_cls] = REC[k];
+      }
+    });
+
+    if(!Object.keys(_myData).length){
+      if(typeof toast==="function") toast("⚠️ لا توجد بيانات للحفظ","");
+      return;
+    }
+
+    _saving = true;
+    _blockListener = true;
+    window._blockListener = true;
+
+    if(typeof setSyncSaving==="function") setSyncSaving();
+    if(typeof toast==="function") toast("⏳ جاري الحفظ...","");
+
+    // حفظ في document واحد لهذا المعلم
+    _db.collection("rasid").doc(_docId).set({
+      username: _username,
+      prefix: _prefix,
+      data: _myData,
+      ts: Date.now()
+    }).then(function(){
+      // نحدّث REC المحلي أيضاً
+      try{ localStorage.setItem("r3_records", JSON.stringify(REC)); }catch(e){}
+
+      window._unsavedChanges = false;
+      _updateSaveBtnState();
+      if(typeof setSyncOk==="function") setSyncOk();
+      if(typeof toast==="function") toast("✅ تم حفظ الرصد","ok");
+      console.log("✅ Saved doc:", _docId, "| classes:", Object.keys(_myData).length);
+
+      _saving = false;
+
+      // إذا كان هناك حفظ معلّق، نُشغّله
+      if(_pendingSave){
+        _pendingSave = false;
+        setTimeout(save, 500);
+      } else {
+        // رفع الحظر بعد ثانيتين
+        setTimeout(function(){
+          _blockListener = false;
+          window._blockListener = false;
+        }, 2000);
+      }
+
+      if(typeof callback==="function") callback();
+
+    }).catch(function(e){
+      console.error("Save error:", e.code, e.message);
+      _saving = false;
+      _blockListener = false;
+      window._blockListener = false;
+
+      if(e.code==="permission-denied" || e.code==="unauthenticated"){
+        if(typeof firebase!=="undefined"){
+          firebase.auth().signInAnonymously()
+            .then(function(){ setTimeout(save, 1500); })
+            .catch(function(){
+              if(typeof setSyncErr==="function") setSyncErr();
+              if(typeof toast==="function") toast("❌ خطأ في الصلاحيات","err");
+            });
+        }
+      } else {
+        if(typeof setSyncErr==="function") setSyncErr();
+        if(typeof toast==="function") toast("❌ فشل الحفظ - حاول مجدداً","err");
+      }
+    });
+  }
+
+  return { save: save };
+})();
+
+// ربط window.manualSave بالنظام الجديد
+window.manualSave = function(){ window._saveSystem.save(); };
+
+// ربط saveREC بالنظام الجديد
+window._manualSaveReady = function(){ window._saveSystem.save(); };
+
+// ============================================================
+// refreshFromCloud - قراءة كل بيانات Firebase
+// ============================================================
+window._origRefreshFromCloud = window.refreshFromCloud;
+window.refreshFromCloud = async function(){
+  toast("⏳ جاري جلب البيانات...","");
+  setSyncSaving();
+
+  var _isAdmin   = typeof ST_!=="undefined" && ST_.adminAuth;
+  var _isTeacher = typeof ST_!=="undefined" && ST_.teacher && ST_.teacher.username;
+  var _isStaff   = typeof ST_!=="undefined" && ST_.staff   && ST_.staff.username;
+  var _db = typeof _fbDB==="function" ? _fbDB() : null;
+  if(!_db){ setSyncErr(); toast("❌ لا يوجد اتصال","err"); return; }
+
+  // حفظ مفاتيح المعلم الحالي قبل التحديث
+  var _myPrefix = null;
+  var _myKeys   = {};
+  if(_isTeacher){ _myPrefix = "t_"+ST_.teacher.username+"_"; }
+  if(_isStaff)  { _myPrefix = "s_"+ST_.staff.username+"_"; }
+  if(_myPrefix){
+    Object.keys(REC).forEach(function(k){
+      if(k.indexOf(_myPrefix)===0) _myKeys[k]=REC[k];
+    });
+  }
+
+  // حظر الـ listener
+  window._blockListener = true;
+  if(typeof _recListener==="function"){ try{_recListener();}catch(e){} }
+  window._recListener = null;
+
+  try{
+    var _allSnap = await _db.collection("rasid").get();
+    var _fbREC = {};
+
+    _allSnap.forEach(function(doc){
+      if(!doc.exists) return;
+      var _raw=doc.data(); if(!_raw) return;
+      var _id=doc.id;
+
+      // النظام الجديد: rec_t_username أو rec_s_username
+      // يحتوي { username, prefix, data: { class: {...} } }
+      if(_id.indexOf("rec_")===0 && _raw.prefix && _raw.data){
+        var _prefix = _raw.prefix;
+        var _clsData = _raw.data;
+        Object.keys(_clsData).forEach(function(cls){
+          var _rkey = _prefix + cls;
+          _fbREC[_rkey] = _clsData[cls];
+        });
+        return;
+      }
+
+      // النظام القديم: records أو rec_t_username_class
+      if(_id==="records"){
+        var _d=_raw.data;
+        if(_d && typeof _d==="object") Object.keys(_d).forEach(function(k){ if(!_fbREC[k]) _fbREC[k]=_d[k]; });
+        return;
+      }
+      if(_id.indexOf("rec_")===0 && _raw.rkey && _raw.data!==undefined){
+        if(!_fbREC[_raw.rkey]) _fbREC[_raw.rkey]=_raw.data;
+        return;
+      }
+
+      var _d2=_raw.data!==undefined?_raw.data:_raw; if(!_d2) return;
+      if(_id==="students")       DB.students       =_d2;
+      else if(_id==="teachers")  DB.teachers       =_d2;
+      else if(_id==="staff")     DB.staff          =_d2;
+      else if(_id==="settings")  DB.settings       =_d2;
+      else if(_id==="teacher_items")  DB.teacher_items  =_d2;
+      else if(_id==="admin_items")    DB.admin_items    =_d2;
+      else if(_id==="physical_items") DB.physical_items =_d2;
+    });
+
+    console.log("📊 Firebase REC total:", Object.keys(_fbREC).length);
+
+    if(_isAdmin){
+      REC = _fbREC;
+    } else {
+      REC = {};
+      Object.assign(REC, _fbREC);
+      Object.assign(REC, _myKeys); // بيانات المعلم المحلية تتغلب
+    }
+    try{ localStorage.setItem("r3_records",JSON.stringify(REC)); }catch(e){}
+
+  }catch(e){
+    console.error("refresh:",e);
+    setSyncErr(); toast("❌ خطأ في التحديث","err");
+    window._blockListener=false; return;
+  }
+
+  renderAdminPanel(); renderFilesTab();
+  if(_isAdmin){
+    var el=document.getElementById("lastSync");
+    if(el) el.textContent=new Date().toLocaleTimeString("ar");
+  }
+  if(typeof ST_!=="undefined"&&ST_.teacher){ buildCBs(ST_.teacher.classes||[],"tCBts",false); if(ST_.tClass) renderTable(false); }
+  if(typeof ST_!=="undefined"&&ST_.staff){   buildCBs(ST_.staff.classes||[],"sCBts",true);  if(ST_.sClass) renderTable(true); }
+
+  setSyncOk();
+  toast("✅ تم التحديث — "+Object.keys(REC).length+" سجل","ok");
+
+  setTimeout(function(){
+    window._blockListener=false;
+    if(typeof startRecordsListener==="function") startRecordsListener();
+    if(typeof startSettingsListener==="function") startSettingsListener();
+  }, 2000);
+};
+
+// ============================================================
+// نظام الواجهة: debounceSave + selCls + autoFill + زر الحفظ
+// ============================================================
+(function initUI(){
+  // إيقاف الحفظ التلقائي
+  window.debounceSave = function(){
+    window._unsavedChanges = true;
+    _updateSaveBtnState();
+  };
+
+  // autoFill: حفظ فوري
+  var _origAF = window.autoFill;
+  if(typeof _origAF==="function"){
+    window.autoFill = function(isStaff){
+      _origAF.apply(this, arguments);
+      window._saveSystem.save(function(){
+        window._unsavedChanges = false;
+        _updateSaveBtnState();
+      });
+    };
+  }
+
+  // TL/SL: تصفير عند الدخول
+  var _origTL=window.TL, _origSL=window.SL;
+  if(typeof _origTL==="function") window.TL=function(){ window._unsavedChanges=false; _origTL.apply(this,arguments); };
+  if(typeof _origSL==="function") window.SL=function(){ window._unsavedChanges=false; _origSL.apply(this,arguments); };
+
+  // selCls: تحذير عند الانتقال
+  var _origSelCls = window.selCls;
+  if(typeof _origSelCls==="function"){
+    window.selCls = function(cls, isStaff){
+      var _li = typeof ST_!=="undefined" && (isStaff ? !!ST_.staff : !!ST_.teacher);
+      if(window._unsavedChanges && _li){
+        var cur = typeof ST_!=="undefined" && (isStaff ? ST_.sClass : ST_.tClass);
+        if(cur && cur!==cls){
+          var ok = confirm("تنبيه: لم يتم حفظ الرصد في الصف "+cur+". الانتقال الى "+cls+"؟");
+          if(!ok){ return; }
+          window._unsavedChanges = false;
+        }
+      }
+      _origSelCls.apply(this, arguments);
+    };
+  }
+
+  // زر الحفظ
+  var _st=document.createElement("style");
+  _st.textContent="@keyframes savePulse{0%,100%{opacity:1}50%{opacity:.8}}";
+  document.head.appendChild(_st);
+
+  new MutationObserver(function(){
+    var _af = document.querySelector('button[onclick*="autoFill"]');
+    if(_af && !document.getElementById("_mainSaveBtn")){
+      var b=document.createElement("button");
+      b.id="_mainSaveBtn"; b.textContent="💾 حفظ الرصد";
+      b.onclick = function(){ window._saveSystem.save(); };
+      b.style.cssText = "background:#1d6fa4;color:#fff;border:none;border-radius:8px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:800;font-family:Cairo,sans-serif;margin-inline-start:6px;transition:background .3s";
+      _af.parentNode.insertBefore(b, _af.nextSibling);
+    }
+  }).observe(document.body, {childList:true, subtree:true});
+
+  console.log("✅ UI save system ready");
+})();
+
+function _updateSaveBtnState(){
+  var btn=document.getElementById("_mainSaveBtn"); if(!btn) return;
+  if(window._unsavedChanges){
+    btn.style.background="#dc2626"; btn.style.animation="savePulse 1.2s infinite"; btn.textContent="💾 حفظ الرصد ●";
+  } else {
+    btn.style.background="#16a34a"; btn.style.animation=""; btn.textContent="✅ تم الحفظ";
+    setTimeout(function(){ if(!window._unsavedChanges&&btn){ btn.style.background="#1d6fa4"; btn.textContent="💾 حفظ الرصد"; } }, 2000);
+  }
+}
+
+function importRecordsFromFile(file){
+  if(!file) return;
+  var _db=typeof _fbDB==="function"?_fbDB():null; if(!_db){toast("❌ لا يوجد اتصال","err");return;}
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var _data=JSON.parse(e.target.result);
+      var _isStaff=_data.type==="staff", _username=_data.username, _records=_data.records||{};
+      if(!_username||!Object.keys(_records).length){toast("⚠️ ملف فارغ","");return;}
+      var _prefix = (_isStaff?"s_":"t_")+_username+"_";
+      var _docId  = "rec_"+(_isStaff?"s_":"t_")+_username.replace(/[/.]/g,"_");
+      Object.keys(_records).forEach(function(cls){ REC[_prefix+cls]=_records[cls]; });
+      toast("⏳ جاري رفع رصد "+(_data.name||_username)+"...","");
+      _db.collection("rasid").doc(_docId).set({
+        username:_username, prefix:_prefix, data:_records, ts:Date.now()
+      }).then(function(){
+        try{localStorage.setItem("r3_records",JSON.stringify(REC));}catch(ex){}
+        renderAdminPanel();
+        toast("✅ تم رفع رصد "+(_data.name||_username)+" ("+Object.keys(_records).length+" صف)","ok");
+      }).catch(function(err){toast("❌ فشل: "+err.message,"err");});
+    }catch(ex){toast("❌ خطأ في قراءة الملف","err");}
+  };
+  reader.readAsText(file,"utf-8");
+}
+
+console.log("✅ Save system v2 loaded");
 </script>
 
 </body>
