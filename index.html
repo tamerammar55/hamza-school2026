@@ -2388,8 +2388,11 @@ window.refreshFromCloud = async function(){
     // toast تشخيصي يظهر الأرقام
     toast("📊 قديم:"+Object.keys(_base).length+" | جديد:"+Object.keys(_newREC).length+" | إجمالي:"+Object.keys(_final).length,"");
     // sample key
-    var _sampleKey = Object.keys(_final)[0]||"لا يوجد";
-    setTimeout(function(){ toast("🔑 مثال: "+_sampleKey,""); },1500);
+    var _keys = Object.keys(_final);
+    var _sampleKey = _keys[0]||"لا يوجد";
+    // نبحث عن مفتاح يحتوي "t_" لإظهاره
+    for(var _ki=0;_ki<_keys.length;_ki++){ if(_keys[_ki].indexOf("t_")===0){_sampleKey=_keys[_ki];break;} }
+    setTimeout(function(){ toast("🔑 "+_sampleKey,""); },1500);
 
     if(_isAdmin){ REC=_final; }
     else { REC={}; Object.assign(REC,_final); Object.assign(REC,_mk); }
@@ -2406,9 +2409,17 @@ window.refreshFromCloud = async function(){
     var _t0=DB.teachers[0], _c0=_t0.classes[0];
     var _rk="t_"+_t0.username+"_"+_c0;
     var _hasKey = !!REC[_rk];
+    // نبحث عن أقرب مفتاح مطابق في REC
+    var _found="";
+    Object.keys(REC).forEach(function(k){
+      if(k.indexOf("t_")===0 && k.indexOf(_c0)>0) _found=k;
+    });
     setTimeout(function(){
-      toast("🧮 "+_t0.name.substring(0,10)+" | صف:"+_c0+" | مفتاح موجود:"+(_hasKey?"نعم✅":"لا❌"),"");
+      toast("متوقع: "+_rk.substring(0,25),"");
     },3000);
+    setTimeout(function(){
+      toast("موجود: "+(_found||"لا شيء").substring(0,25),"");
+    },5000);
   }
   if(_isAdmin){ var el=document.getElementById("lastSync"); if(el) el.textContent=new Date().toLocaleTimeString("ar"); }
   if(typeof ST_!=="undefined"&&ST_.teacher){buildCBs(ST_.teacher.classes||[],"tCBts",false);if(ST_.tClass)renderTable(false);}
