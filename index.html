@@ -2291,7 +2291,8 @@ function _updateSaveIndicator(){
 }
 
 // دالة الحفظ اليدوي
-function manualSave(isStaff){
+function manualSave(){
+  var isStaff = typeof ST_ !== 'undefined' && !!ST_.staff;
   if(typeof saveREC === "function"){
     saveREC();
     window._unsavedChanges = false;
@@ -2337,10 +2338,21 @@ function _injectSaveBtn(){
   // إنشاء زر الحفظ
   var saveDiv = document.createElement('div');
   saveDiv.style.cssText = 'display:flex;align-items:center;gap:8px;margin:8px 0;padding:6px 12px;background:#f0f9ff;border-radius:8px;border:1px solid #bfdbfe;direction:rtl';
-  saveDiv.innerHTML = 
-    '<button id="manualSaveBtn" onclick="manualSave(typeof ST_!=='undefined'&&!!ST_.staff)" style="background:#1d6fa4;color:#fff;border:none;border-radius:8px;padding:7px 18px;cursor:pointer;font-size:13px;font-weight:800;font-family:Cairo,sans-serif">💾 حفظ الرصد</button>' +
-    '<span id="unsavedIndicator" style="display:none;color:#dc2626;font-size:12px;font-weight:700;animation:pulse 1s infinite">● تغييرات غير محفوظة</span>' +
-    '<span style="font-size:11px;color:#64748b">احرص على الحفظ قبل الانتقال لصف آخر</span>';
+  var btn = document.createElement('button');
+  btn.id = 'manualSaveBtn';
+  btn.textContent = '💾 حفظ الرصد';
+  btn.style.cssText = 'background:#1d6fa4;color:#fff;border:none;border-radius:8px;padding:7px 18px;cursor:pointer;font-size:13px;font-weight:800;font-family:Cairo,sans-serif';
+  btn.onclick = function(){ manualSave(); };
+  var ind = document.createElement('span');
+  ind.id = 'unsavedIndicator';
+  ind.textContent = '● تغييرات غير محفوظة';
+  ind.style.cssText = 'display:none;color:#dc2626;font-size:12px;font-weight:700';
+  var hint = document.createElement('span');
+  hint.textContent = 'احرص على الحفظ قبل الانتقال لصف آخر';
+  hint.style.cssText = 'font-size:11px;color:#64748b';
+  saveDiv.appendChild(btn);
+  saveDiv.appendChild(ind);
+  saveDiv.appendChild(hint);
   
   // نُضيف في بداية target
   target.insertBefore(saveDiv, target.firstChild);
