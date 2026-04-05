@@ -2500,59 +2500,39 @@ function manualSave(){
   if(typeof setSyncSaving==="function") setSyncSaving();
   if(typeof toast==="function") toast("⏳ جاري الحفظ...","");
 
-  // بناء update object بـ dot notation لكل مفتاح
-  var _updateObj = {};
-  Object.keys(_myKeys).forEach(function(k){
-    _updateObj["data."+k] = _myKeys[k];
-  });
-
   var _docRef = _db.collection("rasid").doc("records");
 
-  function _doSet(){
-    // set مع merge لإنشاء document لو لم يكن موجوداً
-    var _setData = {};
-    Object.keys(_myKeys).forEach(function(k){ _setData[k]=_myKeys[k]; });
-    return _docRef.set({ data: _setData }, { merge: true });
-  }
-
-  // update أسرع وأأمن (يُحدّث مفاتيح هذا المعلم فقط)
-  _docRef.update(_updateObj)
-    .then(function(){
-      window._unsavedChanges = false;
-      _updateSaveIndicator();
-      if(typeof setSyncOk==="function") setSyncOk();
-      if(typeof toast==="function") toast("✅ تم حفظ الرصد","ok");
-    })
-    .catch(function(e){
-      if(e.code==="not-found"){
-        _doSet()
-          .then(function(){
-            window._unsavedChanges=false;
-            _updateSaveIndicator();
-            if(typeof setSyncOk==="function") setSyncOk();
-            if(typeof toast==="function") toast("✅ تم حفظ الرصد","ok");
-          })
-          .catch(function(e2){
-            if(typeof setSyncErr==="function") setSyncErr();
-            if(typeof toast==="function") toast("❌ فشل الحفظ","err");
-          });
-      } else if(e.code==="permission-denied"||e.code==="unauthenticated"){
-        firebase.auth().signInAnonymously()
-          .then(function(){ setTimeout(manualSave,1500); });
-      } else {
-        _doSet()
-          .then(function(){
-            window._unsavedChanges=false;
-            _updateSaveIndicator();
-            if(typeof setSyncOk==="function") setSyncOk();
-            if(typeof toast==="function") toast("✅ تم حفظ الرصد","ok");
-          })
-          .catch(function(){
-            if(typeof setSyncErr==="function") setSyncErr();
-            if(typeof toast==="function") toast("❌ فشل الحفظ","err");
-          });
+  // الحل: استخدام runTransaction لضمان الدمج الصحيح
+  // بدون "data.key" notation التي تكسر المفاتيح التي تحتوي نقاط
+  _db.runTransaction(function(tx){
+    return tx.get(_docRef).then(function(snap){
+      var _existing = {};
+      if(snap.exists && snap.data() && snap.data().data){
+        _existing = snap.data().data;
       }
+      // دمج: بيانات Firebase + بيانات هذا المعلم (تتغلب)
+      var _merged = {};
+      Object.keys(_existing).forEach(function(k){ _merged[k]=_existing[k]; });
+      Object.keys(_myKeys).forEach(function(k){ _merged[k]=_myKeys[k]; });
+      tx.set(_docRef, { data: _merged });
+      return _merged;
     });
+  }).then(function(_saved){
+    window._unsavedChanges = false;
+    _updateSaveIndicator();
+    if(typeof setSyncOk==="function") setSyncOk();
+    if(typeof toast==="function") toast("✅ تم حفظ الرصد","ok");
+    console.log("✅ manualSave OK - keys:", Object.keys(_saved).length);
+  }).catch(function(e){
+    console.error("manualSave error:", e.code, e.message);
+    if(e.code==="permission-denied"||e.code==="unauthenticated"){
+      firebase.auth().signInAnonymously()
+        .then(function(){ setTimeout(manualSave,1500); });
+    } else {
+      if(typeof setSyncErr==="function") setSyncErr();
+      if(typeof toast==="function") toast("❌ فشل الحفظ - حاول مجدداً","err");
+    }
+  });
 }
 
 // CSS لنبضة الزر
