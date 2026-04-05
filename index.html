@@ -2268,9 +2268,7 @@ setTimeout(function(){
           : (window.ST_ && window.ST_.tClass);
         // فقط إذا كان هناك صف محدد مسبقاً وهو مختلف عن الجديد
         if(curCls && curCls !== cls){
-          if(!confirm("⚠️ لم يتم حفظ بيانات الرصد للصف: " + curCls + "\n\nهل تريد الانتقال لـ " + cls + " بدون حفظ؟")){
-            return; // إلغاء الانتقال
-          }
+          if(!if(!confirm("⚠️ لم يتم حفظ الرصد! الانتقال من " + curCls + " الى " + cls)){         }
           window._unsavedChanges = false;
           _updateSaveIndicator();
         }
