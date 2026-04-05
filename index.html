@@ -955,6 +955,10 @@ async function refreshFromCloud(){
     return;
   }
 
+  console.log("🔍 DB.teachers:", DB.teachers ? DB.teachers.length : 0,
+    "students:", DB.students ? DB.students.length : 0,
+    "REC keys:", Object.keys(REC).length);
+
   // تحديث الواجهة أولاً
   renderAdminPanel();
   renderFilesTab();
