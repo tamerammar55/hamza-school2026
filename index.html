@@ -2257,7 +2257,6 @@ setTimeout(function(){
   var _origSelCls = window.selCls;
   if(typeof _origSelCls === "function"){
     window.selCls = function(cls, isStaff){
-      // التحقق فقط إذا كان المعلم/الإداري مسجلاً ولديه صف محدد مسبقاً
       var _teacher = window.ST_ && window.ST_.teacher;
       var _staff   = window.ST_ && window.ST_.staff;
       var _isLoggedIn = isStaff ? !!_staff : !!_teacher;
@@ -2266,9 +2265,9 @@ setTimeout(function(){
         var curCls = isStaff
           ? (window.ST_ && window.ST_.sClass)
           : (window.ST_ && window.ST_.tClass);
-        // فقط إذا كان هناك صف محدد مسبقاً وهو مختلف عن الجديد
         if(curCls && curCls !== cls){
-          if(!if(!confirm("⚠️ لم يتم حفظ الرصد! الانتقال من " + curCls + " الى " + cls)){         }
+          var ok = confirm("تنبيه: لم يتم حفظ الرصد في الصف " + curCls + ". الانتقال الى " + cls + "؟");
+          if(!ok){ return; }
           window._unsavedChanges = false;
           _updateSaveIndicator();
         }
