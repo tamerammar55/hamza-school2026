@@ -2256,7 +2256,10 @@ setTimeout(function(){
 }, 2000);
 
 // =====================================================
-// نظام الحفظ النهائي - لا تعديل فوق هذا السطر
+// نظام الحفظ - v4 - الحل النهائي
+// المشكلة: records document ضخم جداً
+// الحل: حفظ بيانات الصف الحالي فقط (وليس كل REC)
+// + قراءة صحيحة عند التحديث
 // =====================================================
 
 window.debounceSave = function(){
@@ -2264,6 +2267,8 @@ window.debounceSave = function(){
   _updateSaveBtnState();
 };
 
+// الحفظ: نحفظ بيانات الصف الحالي فقط
+// مفتاح: t_username_class → نحفظ في data[class]
 function manualSave(){
   var _db = typeof _fbDB==="function" ? _fbDB() : null;
   if(!_db){ if(typeof toast==="function") toast("❌ لا يوجد اتصال","err"); return; }
@@ -2271,53 +2276,80 @@ function manualSave(){
   var _username=null, _prefix=null, _docId=null;
   if(typeof ST_!=="undefined"){
     if(ST_.teacher && ST_.teacher.username){
-      _username=ST_.teacher.username; _prefix="t_"+_username+"_"; _docId="rec_t_"+_username.replace(/[/.]/g,"_");
+      _username=ST_.teacher.username;
+      _prefix="t_"+_username+"_";
+      _docId="rec_t_"+_username.replace(/[/.]/g,"_");
     } else if(ST_.staff && ST_.staff.username){
-      _username=ST_.staff.username; _prefix="s_"+_username+"_"; _docId="rec_s_"+_username.replace(/[/.]/g,"_");
+      _username=ST_.staff.username;
+      _prefix="s_"+_username+"_";
+      _docId="rec_s_"+_username.replace(/[/.]/g,"_");
     }
   }
   if(!_username){ if(typeof toast==="function") toast("⚠️ يُرجى تسجيل الدخول",""); return; }
 
+  // جمع بيانات هذا المعلم
   var _myData={}, _plen=_prefix.length;
-  Object.keys(REC).forEach(function(k){ if(k.indexOf(_prefix)===0) _myData[k.substring(_plen)]=REC[k]; });
+  Object.keys(REC).forEach(function(k){
+    if(k.indexOf(_prefix)===0) _myData[k.substring(_plen)]=REC[k];
+  });
   if(!Object.keys(_myData).length){ if(typeof toast==="function") toast("⚠️ لا توجد بيانات",""); return; }
 
   window._blockListener=true;
   if(typeof setSyncSaving==="function") setSyncSaving();
   if(typeof toast==="function") toast("⏳ جاري الحفظ...","");
 
-  _db.collection("rasid").doc(_docId).set({ username:_username, prefix:_prefix, data:_myData, ts:Date.now() })
-  .then(function(){
-    try{ localStorage.setItem("r3_records",JSON.stringify(REC)); }catch(e){}
-    window._unsavedChanges=false; _updateSaveBtnState();
-    if(typeof setSyncOk==="function") setSyncOk();
-    if(typeof toast==="function") toast("✅ تم حفظ الرصد","ok");
-    console.log("Saved:",_docId,Object.keys(_myData).length,"cls");
-    setTimeout(function(){ window._blockListener=false; },2000);
-  }).catch(function(e){
-    window._blockListener=false;
-    if(e.code==="permission-denied"||e.code==="unauthenticated"){
-      if(typeof firebase!=="undefined") firebase.auth().signInAnonymously().then(function(){setTimeout(manualSave,1500);});
-    } else { if(typeof setSyncErr==="function") setSyncErr(); if(typeof toast==="function") toast("❌ فشل الحفظ","err"); }
-  });
+  _db.collection("rasid").doc(_docId)
+    .set({ username:_username, prefix:_prefix, data:_myData, ts:Date.now() })
+    .then(function(){
+      try{ localStorage.setItem("r3_records",JSON.stringify(REC)); }catch(e){}
+      window._unsavedChanges=false;
+      _updateSaveBtnState();
+      if(typeof setSyncOk==="function") setSyncOk();
+      if(typeof toast==="function") toast("✅ تم حفظ الرصد","ok");
+      console.log("✅ Saved:",_docId,Object.keys(_myData).length,"classes");
+      setTimeout(function(){ window._blockListener=false; },2000);
+    }).catch(function(e){
+      window._blockListener=false;
+      console.error("Save:",e.code,e.message);
+      if(e.code==="permission-denied"||e.code==="unauthenticated"){
+        if(typeof firebase!=="undefined")
+          firebase.auth().signInAnonymously().then(function(){setTimeout(manualSave,1500);});
+      } else {
+        if(typeof setSyncErr==="function") setSyncErr();
+        if(typeof toast==="function") toast("❌ فشل الحفظ: "+e.message,"err");
+      }
+    });
 }
 
 window._manualSaveReady = function(){ manualSave(); };
 
+// autoFill + TL/SL + selCls
 setTimeout(function(){
   var _oAF=window.autoFill;
-  if(typeof _oAF==="function") window.autoFill=function(isStaff){ window._blockListener=true; _oAF.apply(this,arguments); setTimeout(function(){manualSave();},200); };
+  if(typeof _oAF==="function") window.autoFill=function(isStaff){
+    window._blockListener=true;
+    _oAF.apply(this,arguments);
+    setTimeout(function(){ manualSave(); window._blockListener=false; },300);
+  };
   var _oTL=window.TL, _oSL=window.SL;
   if(typeof _oTL==="function") window.TL=function(){ window._unsavedChanges=false; _oTL.apply(this,arguments); };
   if(typeof _oSL==="function") window.SL=function(){ window._unsavedChanges=false; _oSL.apply(this,arguments); };
   var _oSC=window.selCls;
   if(typeof _oSC==="function") window.selCls=function(cls,isStaff){
     var _li=typeof ST_!=="undefined"&&(isStaff?!!ST_.staff:!!ST_.teacher);
-    if(window._unsavedChanges&&_li){ var cur=typeof ST_!=="undefined"&&(isStaff?ST_.sClass:ST_.tClass); if(cur&&cur!==cls){var ok=confirm("تنبيه: لم يتم حفظ الرصد في "+cur+". الانتقال الى "+cls+"؟");if(!ok){return;}window._unsavedChanges=false;} }
+    if(window._unsavedChanges&&_li){
+      var cur=typeof ST_!=="undefined"&&(isStaff?ST_.sClass:ST_.tClass);
+      if(cur&&cur!==cls){
+        var ok=confirm("تنبيه: لم يتم حفظ الرصد في "+cur+". الانتقال الى "+cls+"؟");
+        if(!ok){return;} window._unsavedChanges=false;
+      }
+    }
     _oSC.apply(this,arguments);
   };
 },1500);
 
+// refreshFromCloud: الحل الصحيح
+// يقرأ كل البيانات ويدمجها بأولوية صحيحة
 window.refreshFromCloud = async function(){
   toast("⏳ جاري جلب البيانات...",""); setSyncSaving();
   var _isAdmin=typeof ST_!=="undefined"&&ST_.adminAuth;
@@ -2325,36 +2357,100 @@ window.refreshFromCloud = async function(){
   var _isSt=typeof ST_!=="undefined"&&ST_.staff&&ST_.staff.username;
   var _db=typeof _fbDB==="function"?_fbDB():null;
   if(!_db){setSyncErr();toast("❌ لا يوجد اتصال","err");return;}
+
+  // نحفظ مفاتيح المعلم الحالي (غير محفوظة)
   var _mp=null, _mk={};
   if(_isTch) _mp="t_"+ST_.teacher.username+"_";
   if(_isSt)  _mp="s_"+ST_.staff.username+"_";
   if(_mp) Object.keys(REC).forEach(function(k){if(k.indexOf(_mp)===0)_mk[k]=REC[k];});
+
+  // وقف listener تماماً
   window._blockListener=true;
-  if(typeof _recListener==="function"){try{_recListener();}catch(e){}} window._recListener=null;
+  if(typeof _recListener==="function"){try{_recListener();}catch(e){}}
+  window._recListener=null;
+
   try{
     var _snap=await _db.collection("rasid").get();
-    var _leg={}, _nw={};
+
+    // نبدأ بـ records القديم كأساس
+    var _base={};
+    // ثم نطبق rec_* الجديدة فوقه
+    var _newREC={};
+
     _snap.forEach(function(doc){
-      if(!doc.exists) return; var _r=doc.data(); if(!_r) return; var _id=doc.id;
-      if(_id.indexOf("rec_")===0&&_r.prefix&&_r.data){ Object.keys(_r.data).forEach(function(cls){_nw[_r.prefix+cls]=_r.data[cls];}); return; }
-      if(_id==="records"){var _d=_r.data;if(_d&&typeof _d==="object")Object.assign(_leg,_d);return;}
-      if(_id.indexOf("rec_")===0&&_r.rkey&&_r.data!==undefined){if(!_leg[_r.rkey])_leg[_r.rkey]=_r.data;return;}
+      if(!doc.exists) return;
+      var _r=doc.data(); if(!_r) return;
+      var _id=doc.id;
+
+      // النظام الجديد: rec_t_username (كل صفوف معلم)
+      if(_id.indexOf("rec_")===0 && _r.prefix && _r.data){
+        Object.keys(_r.data).forEach(function(cls){
+          _newREC[_r.prefix+cls]=_r.data[cls];
+        });
+        return;
+      }
+      // النظام القديم: records (كل المعلمين)
+      if(_id==="records"){
+        var _d=_r.data;
+        if(_d && typeof _d==="object") Object.assign(_base, _d);
+        return;
+      }
+      // النظام القديم: rec_t_username_class (صف واحد)
+      if(_id.indexOf("rec_")===0 && _r.rkey && _r.data!==undefined){
+        _base[_r.rkey]=_r.data;
+        return;
+      }
+
+      // بيانات أخرى
       var _v=_r.data!==undefined?_r.data:_r; if(!_v) return;
-      if(_id==="students")DB.students=_v; else if(_id==="teachers")DB.teachers=_v; else if(_id==="staff")DB.staff=_v;
-      else if(_id==="settings")DB.settings=_v; else if(_id==="teacher_items")DB.teacher_items=_v;
-      else if(_id==="admin_items")DB.admin_items=_v; else if(_id==="physical_items")DB.physical_items=_v;
+      if(_id==="students")      DB.students      =_v;
+      else if(_id==="teachers") DB.teachers      =_v;
+      else if(_id==="staff")    DB.staff         =_v;
+      else if(_id==="settings") DB.settings      =_v;
+      else if(_id==="teacher_items")  DB.teacher_items  =_v;
+      else if(_id==="admin_items")    DB.admin_items    =_v;
+      else if(_id==="physical_items") DB.physical_items =_v;
     });
-    var _fbREC={}; Object.assign(_fbREC,_leg); Object.assign(_fbREC,_nw);
-    console.log("Legacy:",Object.keys(_leg).length,"New:",Object.keys(_nw).length,"Total:",Object.keys(_fbREC).length);
-    if(_isAdmin){REC=_fbREC;}else{REC={};Object.assign(REC,_fbREC);Object.assign(REC,_mk);}
+
+    // دمج: _base (القديم) أولاً → _newREC (الجديد) يتغلب
+    var _final={};
+    Object.assign(_final, _base);
+    Object.assign(_final, _newREC);
+
+    console.log("Base(old):",Object.keys(_base).length,
+                "| New:",Object.keys(_newREC).length,
+                "| Final:",Object.keys(_final).length);
+
+    if(_isAdmin){
+      REC = _final;
+    } else {
+      // المعلم: Firebase + مفاتيحه الحالية فوقها
+      REC = {};
+      Object.assign(REC, _final);
+      Object.assign(REC, _mk);
+    }
     try{localStorage.setItem("r3_records",JSON.stringify(REC));}catch(e){}
-  }catch(e){console.error("refresh:",e);setSyncErr();toast("❌ خطأ","err");window._blockListener=false;return;}
-  renderAdminPanel();renderFilesTab();
-  if(_isAdmin){var el=document.getElementById("lastSync");if(el)el.textContent=new Date().toLocaleTimeString("ar");}
+
+  }catch(e){
+    console.error("refresh:",e);
+    setSyncErr(); toast("❌ خطأ في التحديث","err");
+    window._blockListener=false; return;
+  }
+
+  renderAdminPanel(); renderFilesTab();
+  if(_isAdmin){
+    var el=document.getElementById("lastSync");
+    if(el) el.textContent=new Date().toLocaleTimeString("ar");
+  }
   if(typeof ST_!=="undefined"&&ST_.teacher){buildCBs(ST_.teacher.classes||[],"tCBts",false);if(ST_.tClass)renderTable(false);}
   if(typeof ST_!=="undefined"&&ST_.staff){buildCBs(ST_.staff.classes||[],"sCBts",true);if(ST_.sClass)renderTable(true);}
-  setSyncOk();toast("✅ تم التحديث — "+Object.keys(REC).length+" سجل","ok");
-  setTimeout(function(){window._blockListener=false;if(typeof startRecordsListener==="function")startRecordsListener();if(typeof startSettingsListener==="function")startSettingsListener();},2000);
+  setSyncOk();
+  toast("✅ تم التحديث — "+Object.keys(REC).length+" سجل","ok");
+  setTimeout(function(){
+    window._blockListener=false;
+    if(typeof startRecordsListener==="function") startRecordsListener();
+    if(typeof startSettingsListener==="function") startSettingsListener();
+  },2000);
 };
 
 async function dirRefreshData(){
@@ -2365,37 +2461,47 @@ async function dirRefreshData(){
 }
 
 function _updateSaveBtnState(){
-  var b=document.getElementById("_mainSaveBtn");if(!b)return;
+  var b=document.getElementById("_mainSaveBtn"); if(!b) return;
   if(window._unsavedChanges){b.style.background="#dc2626";b.style.animation="savePulse 1.2s infinite";b.textContent="💾 حفظ الرصد ●";}
   else{b.style.background="#16a34a";b.style.animation="";b.textContent="✅ تم الحفظ";setTimeout(function(){if(!window._unsavedChanges&&b){b.style.background="#1d6fa4";b.textContent="💾 حفظ الرصد";}},2000);}
 }
 (function(){
   var st=document.createElement("style");st.textContent="@keyframes savePulse{0%,100%{opacity:1}50%{opacity:.8}}";document.head.appendChild(st);
   new MutationObserver(function(){
-    var _af=document.querySelector('button[onclick*="autoFill"]');
-    if(_af&&!document.getElementById("_mainSaveBtn")){
+    var af=document.querySelector('button[onclick*="autoFill"]');
+    if(af&&!document.getElementById("_mainSaveBtn")){
       var b=document.createElement("button");b.id="_mainSaveBtn";b.textContent="💾 حفظ الرصد";
-      b.onclick=function(){manualSave();};b.style.cssText="background:#1d6fa4;color:#fff;border:none;border-radius:8px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:800;font-family:Cairo,sans-serif;margin-inline-start:6px;transition:background .3s";
-      _af.parentNode.insertBefore(b,_af.nextSibling);
+      b.onclick=function(){manualSave();};
+      b.style.cssText="background:#1d6fa4;color:#fff;border:none;border-radius:8px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:800;font-family:Cairo,sans-serif;margin-inline-start:6px;transition:background .3s";
+      af.parentNode.insertBefore(b,af.nextSibling);
     }
   }).observe(document.body,{childList:true,subtree:true});
 })();
 
 function importRecordsFromFile(file){
-  if(!file)return; var _db=typeof _fbDB==="function"?_fbDB():null;if(!_db){toast("❌ لا يوجد اتصال","err");return;}
-  var reader=new FileReader();reader.onload=function(e){
+  if(!file) return;
+  var _db=typeof _fbDB==="function"?_fbDB():null;
+  if(!_db){toast("❌ لا يوجد اتصال","err");return;}
+  var reader=new FileReader();
+  reader.onload=function(e){
     try{
-      var _d=JSON.parse(e.target.result),_u=_d.username,_p=(_d.type==="staff"?"s_":"t_")+_u+"_",_r=_d.records||{};
+      var _d=JSON.parse(e.target.result);
+      var _u=_d.username, _t=_d.type==="staff"?"s_":"t_";
+      var _p=_t+_u+"_", _r=_d.records||{};
       if(!_u||!Object.keys(_r).length){toast("⚠️ ملف فارغ","");return;}
       Object.keys(_r).forEach(function(cls){REC[_p+cls]=_r[cls];});
-      _db.collection("rasid").doc("rec_"+(_d.type==="staff"?"s_":"t_")+_u.replace(/[/.]/g,"_")).set({username:_u,prefix:_p,data:_r,ts:Date.now()}).then(function(){
-        try{localStorage.setItem("r3_records",JSON.stringify(REC));}catch(ex){}
-        renderAdminPanel();toast("✅ تم رفع رصد "+(_d.name||_u)+" ("+Object.keys(_r).length+" صف)","ok");
-      }).catch(function(err){toast("❌ فشل: "+err.message,"err");});
+      _db.collection("rasid").doc("rec_"+_t+_u.replace(/[/.]/g,"_"))
+        .set({username:_u,prefix:_p,data:_r,ts:Date.now()})
+        .then(function(){
+          try{localStorage.setItem("r3_records",JSON.stringify(REC));}catch(ex){}
+          renderAdminPanel();
+          toast("✅ تم رفع رصد "+(_d.name||_u)+" ("+Object.keys(_r).length+" صف)","ok");
+        }).catch(function(err){toast("❌ فشل: "+err.message,"err");});
     }catch(ex){toast("❌ خطأ في الملف","err");}
-  };reader.readAsText(file,"utf-8");
+  };
+  reader.readAsText(file,"utf-8");
 }
-console.log("✅ Save system final v3");
+console.log("✅ Save system v4 ready");
 </script>
 
 </body>
