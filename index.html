@@ -874,71 +874,90 @@ async function refreshFromCloud(){
   var _isStaff   = ST_ && ST_.staff   && ST_.staff.username;
   var _db = typeof _fbDB==="function" ? _fbDB() : null;
 
-  if(_isAdmin && _db){
-    // لوحة الإدارة: قراءة مباشرة من Firebase
-    // أوقف listener لمنع التدخل
-    if(typeof _recListener==="function"){ try{_recListener();}catch(e){} }
-    window._recListener = null;
+  if(!_db){
+    setSyncErr();
+    toast("❌ لا يوجد اتصال","err");
+    return;
+  }
 
-    try{
-      var _snap = await _db.collection("rasid").doc("records").get();
-      if(_snap.exists && _snap.data() && _snap.data().data){
-        REC = _snap.data().data;
-        try{ localStorage.setItem("r3_records", JSON.stringify(REC)); }catch(e){}
-      }
-      // تحميل بقية البيانات
-      await loadAllFromFB();
-      // استعادة REC الصحيح (loadAllFromFB قد يُعيد كتابته)
-      if(_snap.exists && _snap.data() && _snap.data().data){
-        REC = _snap.data().data;
-        try{ localStorage.setItem("r3_records", JSON.stringify(REC)); }catch(e){}
-      }
-    }catch(e){ console.error("admin refresh error:", e); }
+  // حفظ بيانات هذا المعلم قبل أي تحديث
+  var _myKeys = {};
+  if(_isTeacher){
+    var _tu = ST_.teacher.username;
+    Object.keys(REC).forEach(function(k){
+      if(k.indexOf("t_"+_tu+"_")===0) _myKeys[k]=REC[k];
+    });
+  }
+  if(_isStaff){
+    var _su = ST_.staff.username;
+    Object.keys(REC).forEach(function(k){
+      if(k.indexOf("s_"+_su+"_")===0) _myKeys[k]=REC[k];
+    });
+  }
 
-    // أعد listener بعد ثانية (لتجنب onSnapshot الفوري)
-    setTimeout(function(){
-      if(typeof startRecordsListener==="function") startRecordsListener();
-      if(typeof startSettingsListener==="function") startSettingsListener();
-    }, 1000);
+  // حظر listener أثناء التحديث
+  window._blockListener = true;
+  if(typeof _recListener==="function"){ try{_recListener();}catch(e){} }
+  window._recListener = null;
 
-    renderAdminPanel();
-    renderFilesTab();
-    const el = document.getElementById("lastSync");
-    if(el) el.textContent = new Date().toLocaleTimeString("ar");
-
-  } else {
-    // ===== معلم/إداري: حافظ على بياناته =====
-    var _myREC = {};
-    try{ _myREC = JSON.parse(JSON.stringify(REC)); }catch(e){ _myREC = {}; }
-
-    await loadAllFromFB();
-
-    // استعادة بيانات هذا المعلم
-    if(_isTeacher){
-      var _tu = ST_.teacher.username;
-      Object.keys(_myREC).forEach(function(k){
-        if(k.indexOf("t_"+_tu+"_")===0) REC[k]=_myREC[k];
-      });
+  try{
+    // قراءة واحدة مباشرة من Firebase
+    var _recSnap = await _db.collection("rasid").doc("records").get();
+    var _fbREC = {};
+    if(_recSnap.exists && _recSnap.data() && _recSnap.data().data){
+      _fbREC = _recSnap.data().data;
     }
-    if(_isStaff){
-      var _su = ST_.staff.username;
-      Object.keys(_myREC).forEach(function(k){
-        if(k.indexOf("s_"+_su+"_")===0) REC[k]=_myREC[k];
-      });
+
+    // تحديث DB (بيانات المعلمين والطلاب والإعدادات)
+    var _allSnap = await _db.collection("rasid").get();
+    _allSnap.forEach(function(doc){
+      var _d = doc.data() && doc.data().data;
+      if(!_d) return;
+      if(doc.id==="students")  DB.students=_d;
+      else if(doc.id==="teachers") DB.teachers=_d;
+      else if(doc.id==="staff")    DB.staff=_d;
+      else if(doc.id==="settings") DB.settings=_d;
+    });
+
+    if(_isAdmin){
+      // الإدارة: خذ Firebase كما هو
+      REC = _fbREC;
+    } else {
+      // المعلم: Firebase أساس + بياناته المحلية (تغييراته غير المحفوظة) فوقها
+      REC = {};
+      Object.keys(_fbREC).forEach(function(k){ REC[k]=_fbREC[k]; });
+      Object.keys(_myKeys).forEach(function(k){ REC[k]=_myKeys[k]; });
     }
+
     try{ localStorage.setItem("r3_records", JSON.stringify(REC)); }catch(e){}
 
-    startRecordsListener();
-    startSettingsListener();
+  }catch(e){
+    console.error("refresh error:", e);
+    toast("❌ خطأ في التحديث","err");
+  }
 
-    if(ST_.teacher){
-      buildCBs(ST_.teacher.classes||[], "tCBts", false);
-      if(ST_.tClass) renderTable(false);
-    }
-    if(ST_.staff){
-      buildCBs(ST_.staff.classes||[], "sCBts", true);
-      if(ST_.sClass) renderTable(true);
-    }
+  // رفع حظر listener بعد ثانية
+  setTimeout(function(){
+    window._blockListener = false;
+    if(typeof startRecordsListener==="function") startRecordsListener();
+    if(typeof startSettingsListener==="function") startSettingsListener();
+  }, 1500);
+
+  // تحديث الواجهة
+  renderAdminPanel();
+  renderFilesTab();
+
+  if(_isAdmin){
+    var el = document.getElementById("lastSync");
+    if(el) el.textContent = new Date().toLocaleTimeString("ar");
+  }
+  if(ST_ && ST_.teacher){
+    buildCBs(ST_.teacher.classes||[], "tCBts", false);
+    if(ST_.tClass) renderTable(false);
+  }
+  if(ST_ && ST_.staff){
+    buildCBs(ST_.staff.classes||[], "sCBts", true);
+    if(ST_.sClass) renderTable(true);
   }
 
   setSyncOk();
