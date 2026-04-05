@@ -869,61 +869,80 @@ async function refreshFromCloud(){
   toast("⏳ جاري جلب البيانات من السحابة...","");
   setSyncSaving();
 
-  // تحديد من يطلب التحديث
-  var _isAdmin  = ST_ && ST_.adminAuth;
+  var _isAdmin   = ST_ && ST_.adminAuth;
   var _isTeacher = ST_ && ST_.teacher && ST_.teacher.username;
   var _isStaff   = ST_ && ST_.staff   && ST_.staff.username;
+  var _db = typeof _fbDB==="function" ? _fbDB() : null;
 
-  if(_isAdmin){
-    // لوحة الإدارة: تحميل كل شيء من Firebase بدون دمج
-    await loadAllFromFB();
+  if(_isAdmin && _db){
+    // ===== لوحة الإدارة: قراءة مباشرة من Firebase =====
+    // 1. أوقف الـ listener لمنع التدخل
+    if(typeof _recListener==="function"){ try{_recListener();}catch(e){} _recListener=null; }
+
+    try{
+      // قراءة مباشرة بـ .get() (وليس onSnapshot)
+      var _snap = await _db.collection("rasid").get();
+      _snap.forEach(function(doc){
+        var _data = doc.data() && doc.data().data;
+        if(_data===undefined||_data===null) return;
+        if(doc.id==="records"){
+          // هنا البيانات الحقيقية الحالية من Firebase
+          REC = _data;
+          try{ localStorage.setItem("r3_records", JSON.stringify(REC)); }catch(e){}
+        } else if(doc.id==="students")  { DB.students=_data; }
+        else if(doc.id==="teachers")  { DB.teachers=_data; }
+        else if(doc.id==="staff")     { DB.staff=_data; }
+        else if(doc.id==="settings")  { DB.settings=_data; }
+      });
+    }catch(e){ console.error("refresh error:", e); }
+
+    // 2. أعد تشغيل الـ listener
+    if(typeof startRecordsListener==="function") startRecordsListener();
+    if(typeof startSettingsListener==="function") startSettingsListener();
+
+    // 3. حدّث الواجهة
+    renderAdminPanel();
+    renderFilesTab();
+    const el = document.getElementById("lastSync");
+    if(el) el.textContent = new Date().toLocaleTimeString("ar");
 
   } else {
-    // معلم/إداري: احتفظ ببياناته، وحدّث DB فقط من Firebase
+    // ===== معلم/إداري: حافظ على بياناته =====
     var _myREC = {};
     try{ _myREC = JSON.parse(JSON.stringify(REC)); }catch(e){ _myREC = {}; }
 
-    await loadAllFromFB(); // يُحدّث REC بالكامل من Firebase
+    await loadAllFromFB();
 
-    // أعد بيانات هذا المعلم لحماية تغييراته غير المحفوظة
+    // استعادة بيانات هذا المعلم
     if(_isTeacher){
       var _tu = ST_.teacher.username;
       Object.keys(_myREC).forEach(function(k){
-        if(k.indexOf("t_"+_tu+"_") === 0) REC[k] = _myREC[k];
+        if(k.indexOf("t_"+_tu+"_")===0) REC[k]=_myREC[k];
       });
     }
     if(_isStaff){
       var _su = ST_.staff.username;
       Object.keys(_myREC).forEach(function(k){
-        if(k.indexOf("s_"+_su+"_") === 0) REC[k] = _myREC[k];
+        if(k.indexOf("s_"+_su+"_")===0) REC[k]=_myREC[k];
       });
     }
     try{ localStorage.setItem("r3_records", JSON.stringify(REC)); }catch(e){}
-  }
 
-  // إعادة تشغيل المستمعات
-  startRecordsListener();
-  startSettingsListener();
+    startRecordsListener();
+    startSettingsListener();
 
-  // تحديث الواجهة
-  renderAdminPanel();
-  renderFilesTab();
-
-  if(_isAdmin){
-    const el = document.getElementById("lastSync");
-    if(el) el.textContent = new Date().toLocaleTimeString("ar");
-  }
-  if(ST_.teacher){
-    buildCBs(ST_.teacher.classes||[], "tCBts", false);
-    if(ST_.tClass) renderTable(false);
-  }
-  if(ST_.staff){
-    buildCBs(ST_.staff.classes||[], "sCBts", true);
-    if(ST_.sClass) renderTable(true);
+    if(ST_.teacher){
+      buildCBs(ST_.teacher.classes||[], "tCBts", false);
+      if(ST_.tClass) renderTable(false);
+    }
+    if(ST_.staff){
+      buildCBs(ST_.staff.classes||[], "sCBts", true);
+      if(ST_.sClass) renderTable(true);
+    }
   }
 
   setSyncOk();
-  toast("✅ تم تحديث البيانات من السحابة","ok");
+  toast("✅ تم تحديث البيانات","ok");
 }
 </script>
 
