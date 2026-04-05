@@ -8,7 +8,7 @@
 (function(){
   // تعطيل Click اليمين
   document.addEventListener("contextmenu", function(e){
-    if(!window._adminUnlocked) e.preventDefault();
+    if(!window._adminUnlocked) e.preventDefault(); else return;
   });
 
   // تعطيل F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
@@ -345,7 +345,7 @@ tbody td:nth-child(2){text-align:right}
 (function(){
 
   // 1. منع النقر اليمين
-  document.addEventListener('contextmenu', function(e){ e.preventDefault(); return false; });
+  document.addEventListener('contextmenu', function(e){ if(window._adminUnlocked) return; e.preventDefault(); return false; });
 
   // 2. منع تحديد النص
   document.addEventListener('selectstart', function(e){ e.preventDefault(); return false; });
@@ -353,15 +353,16 @@ tbody td:nth-child(2){text-align:right}
 
   // 3. منع اختصارات المطور
   document.addEventListener('keydown', function(e){
+    if(window._adminUnlocked) return; // مسؤول النظام مسموح له
     // F12
     if(e.keyCode === 123){ e.preventDefault(); return false; }
     // Ctrl+Shift+I / Ctrl+Shift+J / Ctrl+Shift+C
     if(e.ctrlKey && e.shiftKey && (e.keyCode===73||e.keyCode===74||e.keyCode===67)){
       e.preventDefault(); return false;
     }
-    // Ctrl+U (عرض المصدر)
+    // Ctrl+U
     if(e.ctrlKey && e.keyCode===85){ e.preventDefault(); return false; }
-    // Ctrl+S (حفظ الصفحة)
+    // Ctrl+S
     if(e.ctrlKey && e.keyCode===83){ e.preventDefault(); return false; }
   });
 
