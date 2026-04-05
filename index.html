@@ -2343,45 +2343,91 @@ function _updateSaveIndicator(){
 
 // دالة الحفظ اليدوي
 function manualSave(){
-  if(typeof saveREC !== "function"){
-    if(typeof toast==="function") toast("❌ دالة الحفظ غير متاحة","err");
-    return;
-  }
-
-  // التأكد من Auth قبل الحفظ
   var _db = typeof _fbDB==="function" ? _fbDB() : null;
   if(!_db){
-    if(typeof toast==="function") toast("❌ لا يوجد اتصال بقاعدة البيانات","err");
+    if(typeof toast==="function") toast("❌ لا يوجد اتصال","err");
     return;
   }
 
-  // إظهار حالة الحفظ
+  // نحدد مفاتيح هذا المعلم/الإداري فقط
+  var _myKeys = {};
+  try{
+    // المعلم
+    if(ST_ && ST_.teacher && ST_.teacher.username){
+      var _tu = ST_.teacher.username;
+      Object.keys(REC).forEach(function(k){
+        if(k.indexOf("t_"+_tu+"_") === 0) _myKeys[k] = REC[k];
+      });
+    }
+    // الإداري
+    if(ST_ && ST_.staff && ST_.staff.username){
+      var _su = ST_.staff.username;
+      Object.keys(REC).forEach(function(k){
+        if(k.indexOf("s_"+_su+"_") === 0) _myKeys[k] = REC[k];
+      });
+    }
+    // إذا لم يُحدَّد مستخدم → احفظ كل REC (لوحة الإدارة)
+    if(Object.keys(_myKeys).length === 0){
+      _myKeys = JSON.parse(JSON.stringify(REC));
+    }
+  }catch(e){
+    try{ _myKeys = JSON.parse(JSON.stringify(REC)); }catch(e2){ _myKeys = REC; }
+  }
+
+  if(Object.keys(_myKeys).length === 0){
+    if(typeof toast==="function") toast("⚠️ لا توجد بيانات للحفظ","");
+    return;
+  }
+
   if(typeof setSyncSaving==="function") setSyncSaving();
   if(typeof toast==="function") toast("⏳ جاري حفظ الرصد...","");
 
-  // حفظ مباشر: نقرأ Firebase أولاً ثم ندمج ثم نكتب
+  // حفظ باستخدام update بدلاً من set
+  // update يُحدّث المفاتيح المحددة فقط بدون مسح بيانات المعلمين الآخرين
+  var _updateObj = {};
+  Object.keys(_myKeys).forEach(function(k){
+    _updateObj["data."+k] = _myKeys[k];
+  });
+
   var _docRef = _db.collection("rasid").doc("records");
-  _docRef.get().then(function(snap){
-    var _fbData = (snap.exists && snap.data() && snap.data().data) ? snap.data().data : {};
-    // دمج: Firebase أساس + REC المحلي يتغلب (بيانات هذا المعلم)
-    var _merged = Object.assign({}, _fbData, REC);
-    return _docRef.set({ data: _merged });
-  }).then(function(){
-    // تحديث REC المحلي بالبيانات المدمجة
+
+  // نحاول update أولاً (يحتاج document موجود)
+  _docRef.update(_updateObj).then(function(){
     window._unsavedChanges = false;
     _updateSaveIndicator();
     if(typeof setSyncOk==="function") setSyncOk();
-    if(typeof toast==="function") toast("✅ تم حفظ الرصد بنجاح في قاعدة البيانات","ok");
+    if(typeof toast==="function") toast("✅ تم حفظ الرصد بنجاح","ok");
   }).catch(function(err){
-    console.error("manualSave error:", err);
-    // محاولة عبر Firebase Auth
-    if(err.code === "permission-denied"){
+    if(err.code === "not-found"){
+      // Document غير موجود → أنشئه بـ set
+      var _setObj = {};
+      Object.keys(_myKeys).forEach(function(k){ _setObj[k] = _myKeys[k]; });
+      _docRef.set({ data: _setObj }, { merge: true }).then(function(){
+        window._unsavedChanges = false;
+        _updateSaveIndicator();
+        if(typeof setSyncOk==="function") setSyncOk();
+        if(typeof toast==="function") toast("✅ تم حفظ الرصد بنجاح","ok");
+      }).catch(function(e2){
+        if(typeof setSyncErr==="function") setSyncErr();
+        if(typeof toast==="function") toast("❌ فشل الحفظ","err");
+      });
+    } else if(err.code === "permission-denied" || err.code === "unauthenticated"){
       firebase.auth().signInAnonymously().then(function(){
-        return manualSave(); // إعادة المحاولة
+        setTimeout(manualSave, 1000);
       });
     } else {
-      if(typeof setSyncErr==="function") setSyncErr();
-      if(typeof toast==="function") toast("❌ فشل الحفظ: "+err.message,"err");
+      // fallback: set مع merge
+      var _setObj2 = {};
+      Object.keys(_myKeys).forEach(function(k){ _setObj2[k] = _myKeys[k]; });
+      _docRef.set({ data: _setObj2 }, { merge: true }).then(function(){
+        window._unsavedChanges = false;
+        _updateSaveIndicator();
+        if(typeof setSyncOk==="function") setSyncOk();
+        if(typeof toast==="function") toast("✅ تم حفظ الرصد","ok");
+      }).catch(function(){
+        if(typeof setSyncErr==="function") setSyncErr();
+        if(typeof toast==="function") toast("❌ فشل الحفظ","err");
+      });
     }
   });
 }
