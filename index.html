@@ -2888,6 +2888,166 @@ function importRecordsFromFile(file){
 }
 console.log("✅ Save system final loaded");
 </script>
+<!-- ===================================== -->
+<!-- 🔥 START: REPORT PDF UPGRADE PATCH -->
+<!-- أضف هذا الكود قبل </body> مباشرة -->
+<!-- ===================================== -->
+
+<script>
+
+// =============================
+// 🎨 ألوان الدرجات
+// =============================
+function getGradeColor(val){
+  if(val >= 90) return "#16a34a";
+  if(val >= 60) return "#eab308";
+  return "#dc2626";
+}
+
+// =============================
+// 🧾 بناء صفوف المواد
+// =============================
+function buildRows(st){
+  let rows = "";
+
+  if(!st.subjects) return "";
+
+  st.subjects.forEach(sub => {
+
+    let color = getGradeColor(sub.percentage || 0);
+
+    let maxStyle = (sub.score == sub.max)
+      ? "background:#fef3c7;font-weight:800"
+      : "";
+
+    rows += `
+    <tr>
+      <td>${sub.name || "-"}</td>
+      <td style="${maxStyle}">
+        ${sub.score || 0} / ${sub.max || 0}
+      </td>
+      <td style="color:${color};font-weight:800">
+        ${sub.percentage || 0}%
+      </td>
+    </tr>`;
+  });
+
+  return rows;
+}
+
+// =============================
+// 📄 تصميم التقرير (مطابق للمرفق)
+// =============================
+function buildStudentReport(st){
+
+  return `
+  <div style="font-family:Cairo;padding:25px">
+
+    <div style="text-align:center;margin-bottom:10px">
+      <h2 style="color:#0d3b6e;margin:0">نظام الرصد المدرسي</h2>
+      <div style="font-size:13px;color:#555">التقرير السلوكي الأكاديمي</div>
+    </div>
+
+    <h3 style="text-align:center;margin:15px 0">تقرير أداء الطالب</h3>
+
+    <div style="margin-bottom:12px;font-size:14px">
+      <b>الاسم:</b> ${st.name || "-"} <br>
+      <b>الصف:</b> ${st.class || "-"} <br>
+      <b>الشهر:</b> ${st.month || "-"}
+    </div>
+
+    <table style="width:100%;border-collapse:collapse;text-align:center;font-size:13px">
+      <thead>
+        <tr style="background:#1a2332;color:#fff">
+          <th style="padding:8px">المادة</th>
+          <th>الدرجة</th>
+          <th>النسبة</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${buildRows(st)}
+      </tbody>
+    </table>
+
+    <div style="margin-top:30px;display:flex;justify-content:space-between;font-size:13px">
+      <div>النائب الأكاديمي</div>
+      <div>مدير المدرسة</div>
+    </div>
+
+  </div>`;
+}
+
+// =============================
+// 📥 تصدير PDF فردي
+// =============================
+function exportPDFfromHTML(html){
+
+  let opt = {
+    margin: 5,
+    filename: 'report.pdf',
+    image: { type: 'jpeg', quality: 1 },
+    html2canvas: { scale: 3 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+
+  html2pdf().set(opt).from(html).save();
+}
+
+// =============================
+// 🔥 إصدار جميع التقارير
+// =============================
+async function generateAllReports(){
+
+  if(!REC || Object.keys(REC).length === 0){
+    toast("⚠️ لا توجد بيانات", "warn");
+    return;
+  }
+
+  let zip = new JSZip();
+  let count = 0;
+
+  for(let key in REC){
+    let st = REC[key];
+
+    let html = buildStudentReport(st);
+
+    let opt = {
+      margin: 0,
+      filename: 'report.pdf',
+      image: { type: 'jpeg', quality: 1 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    let blob = await html2pdf().set(opt).from(html).outputPdf('blob');
+
+    zip.file((st.name || "طالب") + ".pdf", blob);
+    count++;
+  }
+
+  zip.generateAsync({type:"blob"}).then(function(content){
+    let a = document.createElement("a");
+    a.href = URL.createObjectURL(content);
+    a.download = "تقارير_الطلاب.zip";
+    a.click();
+  });
+
+  toast("✅ تم إصدار " + count + " تقرير", "ok");
+}
+
+</script>
+
+<!-- ===================================== -->
+<!-- 🎯 زر إصدار جميع التقارير (أضفه في لوحة الإدارة) -->
+<!-- ===================================== -->
+
+<button class="btn bg" onclick="generateAllReports()" style="margin-top:10px">
+📄 إصدار تقارير جميع الطلاب PDF
+</button>
+
+<!-- ===================================== -->
+<!-- 🔥 END PATCH -->
+<!-- ===================================== -->
 
 </body>
 </html>
