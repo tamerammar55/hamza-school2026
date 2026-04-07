@@ -2025,11 +2025,6 @@ function renderParentReport(student){
       ? "<span style='font-size:9px;background:#fee2e2;color:#991b1b;padding:2px 7px;border-radius:20px;margin-right:auto'>"+sec.status+"</span>"
       : "";
 
-    const hdrIcon = sec.type==="admin" ? "🛡️" : "📚";
-
-    return "<div class='cert-subject'>"
-      + "<div class='cert-sub-hdr'>"+hdrIcon+" "+sec.subject+" "+statusBadge
-      + "<span style='font-weight:400;opacity:.65;font-size:9px;margin-right:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px'>"+teacherNames+"</span></div>"
   // old subjectsHTML removed
 
   const noDataHTML = "<div style='text-align:center;padding:30px;color:#888;grid-column:1/-1'>"
