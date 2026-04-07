@@ -1327,7 +1327,7 @@ function renderDirectorPanel(){
   h.push('<div style="font-size:9px;opacity:.7">'+sysName+' | '+year+'</div></div>');
   h.push('<div style="display:flex;align-items:center;gap:10px">');
   h.push('<div style="text-align:center"><div style="font-size:18px;font-weight:900;color:'+pC(gP)+'">'+gP+'%</div><div style="font-size:9px;opacity:.8">إنجاز المدرسة</div></div>');
-  h.push('<button onclick="dirRefreshData()" style="background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.4);border-radius:8px;padding:7px 14px;cursor:pointer;font-size:11px;font-weight:800;font-family:Cairo,sans-serif" id="dirRefreshBtn">🔄 تحديث</button> <button onclick="_showExportDialog()" style="background:#0f766e;color:#fff;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:11px;font-weight:800;font-family:Cairo,sans-serif;margin-right:4px">📥 تصدير تقارير الطلاب PDF</button>');
+  h.push('<button onclick="dirRefreshData()" style="background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.4);border-radius:8px;padding:7px 14px;cursor:pointer;font-size:11px;font-weight:800;font-family:Cairo,sans-serif" id="dirRefreshBtn">🔄 تحديث</button>');
   h.push('</div></div>');
 
   // KPIs
@@ -1519,6 +1519,18 @@ function injectAdminExtras(){
 
     <!-- صندوق تحذيرات التكرار -->
     <div id="dupWarningBox"></div>
+  
+    <!-- تصدير تقارير الطلاب -->
+    <div style="background:linear-gradient(135deg,#f0fdf9,#ecfdf5);border:1.5px solid #6ee7b7;border-radius:12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:26px">📄</span>
+        <div>
+          <div style="font-size:13px;font-weight:900;color:#0f766e">تصدير تقارير الطلاب</div>
+          <div style="font-size:11px;color:#6b7280">صدِّر تقارير أداء الطلاب بصيغة PDF مضغوطة</div>
+        </div>
+      </div>
+      <button onclick="_showExportDialog()" style="background:#0f766e;color:#fff;border:none;border-radius:10px;padding:10px 22px;cursor:pointer;font-size:13px;font-weight:900;font-family:Cairo,sans-serif">📥 تصدير PDF</button>
+    </div>
   `;
 
   // إدراج في adminContent
