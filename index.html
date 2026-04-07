@@ -1327,7 +1327,7 @@ function renderDirectorPanel(){
   h.push('<div style="font-size:9px;opacity:.7">'+sysName+' | '+year+'</div></div>');
   h.push('<div style="display:flex;align-items:center;gap:10px">');
   h.push('<div style="text-align:center"><div style="font-size:18px;font-weight:900;color:'+pC(gP)+'">'+gP+'%</div><div style="font-size:9px;opacity:.8">إنجاز المدرسة</div></div>');
-  h.push('<button onclick="dirRefreshData()" style="background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.4);border-radius:8px;padding:7px 14px;cursor:pointer;font-size:11px;font-weight:800;font-family:Cairo,sans-serif" id="dirRefreshBtn">🔄 تحديث</button>');
+  h.push('<button onclick="dirRefreshData()" style="background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.4);border-radius:8px;padding:7px 14px;cursor:pointer;font-size:11px;font-weight:800;font-family:Cairo,sans-serif" id="dirRefreshBtn">🔄 تحديث</button> <button onclick="_showExportDialog()" style="background:#0f766e;color:#fff;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:11px;font-weight:800;font-family:Cairo,sans-serif;margin-right:4px">📥 تصدير تقارير الطلاب PDF</button>');
   h.push('</div></div>');
 
   // KPIs
@@ -2009,7 +2009,7 @@ function renderParentReport(student){
           var pct2=(!isNaN(vN)&&!isNaN(mN)&&mN>0)?(vN/mN)*100:0;
           var sc=pct2>=90?"#15803d":pct2>=75?"#0f766e":pct2>=60?"#b45309":pct2>=40?"#c2410c":"#dc2626";
           if(isFull){display="<span style='background:#0f766e;color:#fff;border-radius:5px;padding:1px 5px;font-size:10px;font-weight:900;'>"+v+" / "+mN+"</span>";}
-          else{display="<span style='color:"+sc+";font-size:10px;font-weight:900;'>"+v+"</span><span style='color:#9ca3af;font-size:8px;'> / "+mN+"</span>";}
+          else{display="<span style='color:"+sc+";font-size:10px;font-weight:900;'>"+v+"</span><span style='color:#9ca3af;font-size:10px;font-weight:400;'> / "+mN+"</span>";}
         }else{display=v;}
         return "<td class='tbl-td-val" + ((!sec.scores[ci]||sec.scores[ci]==="")?(" empty"):"") + "'>" + display + "</td>";
       }).join("");
@@ -2058,18 +2058,18 @@ function renderParentReport(student){
     + "</tbody></table>"
     // التوقيعات
     + "<div class='cert-sigs'>"
-    +   "<div class='cert-sig'>"
-    +     "<div class='cert-sig-title'>النائب الأكاديمي</div>"
-    +     "<div class='cert-sig-line'>"+(s.vp||"")+"</div>"
+    +   "<div class='cert-sig' style='border:2px solid #0f766e;border-radius:8px;padding:5px 12px;background:#f0fdf9;'>"
+    +     "<div class='cert-sig-title' style='color:#0f766e;font-weight:900;font-size:10px;'>النائب الأكاديمي</div>"
+    +     "<div class='cert-sig-line' style='color:#0f766e;font-size:11px;font-weight:900;'>"+(s.vp||"")+"</div>"
     +   "</div>"
     +   "<div class='cert-sig' style='border:2px solid #1e40af;border-radius:8px;padding:5px 12px;background:#eff6ff;'>"
     +     "<div class='cert-sig-title' style='color:#1e40af;font-weight:900;font-size:10px;'>النائب الإداري</div>"
-    +     "<div class='cert-sig-line admin-sig' style='color:#1d4ed8;font-size:11px;'>ناصر الهيل</div>"
+    +     "<div class='cert-sig-line' style='color:#1d4ed8;font-size:11px;font-weight:900;'>ناصر الهيل</div>"
     +   "</div>"
     +   "<div class='cert-date'>📅 "+date+"</div>"
-    +   "<div class='cert-sig'>"
-    +     "<div class='cert-sig-title'>مدير المدرسة</div>"
-    +     "<div class='cert-sig-line'>"+(s.mgr||"")+"</div>"
+    +   "<div class='cert-sig' style='border:2px solid #7c3aed;border-radius:8px;padding:5px 12px;background:#faf5ff;'>"
+    +     "<div class='cert-sig-title' style='color:#7c3aed;font-weight:900;font-size:10px;'>مدير المدرسة</div>"
+    +     "<div class='cert-sig-line' style='color:#6d28d9;font-size:11px;font-weight:900;'>"+(s.mgr||"")+"</div>"
     +   "</div>"
     + "</div>"
     + "</div>"
@@ -2137,7 +2137,7 @@ function exportStudentPDF(){
     + '.tbl-td-sub.admin{color:#1d4ed8;border-right:2.5px solid #3b82f6!important;}'
     + '.tbl-td-sub.pe{color:#166534;border-right:2.5px solid #16a34a!important;}'
     + '.tbl-td-teacher{font-size:8px;color:#6b7280;}'
-    + '.tbl-td-val{text-align:center;font-size:9.5px;font-weight:900;color:#1a2332;}'
+    + '.tbl-td-val{text-align:center;font-size:10px;font-weight:900;color:#1a2332;}'
     + '.tbl-td-val.empty{color:#9ca3af;font-weight:400;}'
     + '.score-wrap{display:inline-flex;align-items:baseline;gap:1px;}'
     + '.score-num{font-size:11px;font-weight:900;color:#0f766e;}'
@@ -2827,7 +2827,7 @@ function _wrapForPrint(certHTML, name){
     '.tbl-td-sub.admin{color:#1d4ed8;border-right:2.5px solid #3b82f6!important;}',
     '.tbl-td-sub.pe{color:#166534;border-right:2.5px solid #16a34a!important;}',
     '.tbl-td-teacher{font-size:8px;color:#6b7280;}',
-    '.tbl-td-val{text-align:center;font-size:9.5px;font-weight:900;color:#1a2332;}',
+    '.tbl-td-val{text-align:center;font-size:10px;font-weight:900;color:#1a2332;}',
     '.tbl-td-val.empty{color:#9ca3af;font-weight:400;}',
     '.score-wrap{display:inline-flex;align-items:baseline;gap:1px;}',
     '.score-num{font-size:11px;font-weight:900;color:#0f766e;}',
