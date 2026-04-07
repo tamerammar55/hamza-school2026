@@ -2002,13 +2002,21 @@ function renderParentReport(student){
     } else {
       _tdItems = _allItems.map(function(it, ci){
         var v = sec.absent ? "—" : (sec.scores[ci]!==undefined && sec.scores[ci]!=="" ? sec.scores[ci] : "—");
-        var display = it.type==="number" && v!=="—" ? v+" / "+it.max : v;
+        var display;
+        if(it.type==="number" && v!=="—"){
+          var vN=parseFloat(v),mN=parseFloat(it.max);
+          var isFull=!isNaN(vN)&&!isNaN(mN)&&mN>0&&vN>=mN;
+          var pct2=(!isNaN(vN)&&!isNaN(mN)&&mN>0)?(vN/mN)*100:0;
+          var sc=pct2>=90?"#15803d":pct2>=75?"#0f766e":pct2>=60?"#b45309":pct2>=40?"#c2410c":"#dc2626";
+          if(isFull){display="<span style='background:#0f766e;color:#fff;border-radius:5px;padding:1px 5px;font-size:10px;font-weight:900;'>"+v+" / "+mN+"</span>";}
+          else{display="<span style='color:"+sc+";font-size:10px;font-weight:900;'>"+v+"</span><span style='color:#9ca3af;font-size:8px;'> / "+mN+"</span>";}
+        }else{display=v;}
         return "<td class='tbl-td-val" + ((!sec.scores[ci]||sec.scores[ci]==="")?(" empty"):"") + "'>" + display + "</td>";
       }).join("");
     }
     var _gradeCell = sec.m
       ? "<td class='tbl-td-grade'><span class='grade-pill' style='background:" + sec.m.col + "22;color:" + sec.m.col + ";border:1px solid " + sec.m.col + "44'>" + sec.m.ps + " " + sec.m.lbl + "</span></td>"
-      : (isAdmin ? "<td class='tbl-td-grade'></td>" : "<td class='tbl-td-grade'><span class='grade-empty'>لم يُرصد</span></td>");
+      : (isAdmin ? "<td class='tbl-td-grade'></td>" : "<td class='tbl-td-grade'></td>");
     var _statusBadge = (sec.status && sec.status!=="حاضر" && sec.status!=="—")
       ? " <span class='status-badge'>" + sec.status + "</span>" : "";
     var _noteRow = (sec.note && sec.note.trim())
@@ -2054,9 +2062,9 @@ function renderParentReport(student){
     +     "<div class='cert-sig-title'>النائب الأكاديمي</div>"
     +     "<div class='cert-sig-line'>"+(s.vp||"")+"</div>"
     +   "</div>"
-    +   "<div class='cert-sig' style='border:1.5px dashed #3b82f644;border-radius:6px;padding:3px 10px;'>"
-    +     "<div class='cert-sig-title' style='color:#1d4ed8;'>النائب الإداري</div>"
-    +     "<div class='cert-sig-line admin-sig'>ناصر الهيل</div>"
+    +   "<div class='cert-sig' style='border:2px solid #1e40af;border-radius:8px;padding:5px 12px;background:#eff6ff;'>"
+    +     "<div class='cert-sig-title' style='color:#1e40af;font-weight:900;font-size:10px;'>النائب الإداري</div>"
+    +     "<div class='cert-sig-line admin-sig' style='color:#1d4ed8;font-size:11px;'>ناصر الهيل</div>"
     +   "</div>"
     +   "<div class='cert-date'>📅 "+date+"</div>"
     +   "<div class='cert-sig'>"
@@ -2113,9 +2121,9 @@ function exportStudentPDF(){
     + '.cert-stu-name{font-size:11px;font-weight:900;color:#0f766e;}'
     + '.cert-stu-info{font-size:9px;color:#6b7280;}'
     + '.cert-stu-badge{font-size:9px;font-weight:800;background:#0f766e22;color:#0f766e;padding:2px 8px;border-radius:12px;}'
-    + '.cert-table{width:100%;border-collapse:collapse;font-size:9px;}'
+    + '.cert-table{width:100%;border-collapse:collapse;font-size:10px;}'
     + '.tbl-hdr-row{background:#0f766e;}'
-    + '.tbl-hdr-row th{color:#fff;padding:4px 6px;font-weight:700;font-size:9px;text-align:center;border:1px solid #0d5c56;white-space:nowrap;}'
+    + '.tbl-hdr-row th{color:#fff;padding:4px 6px;font-weight:700;font-size:10px;text-align:center;border:1px solid #0d5c56;white-space:nowrap;}'
     + '.tbl-th-sub{text-align:right!important;padding-right:8px!important;min-width:95px;}'
     + '.tbl-th-teacher{min-width:75px;}'
     + '.tbl-th-item{min-width:48px;}'
@@ -2125,7 +2133,7 @@ function exportStudentPDF(){
     + '.tbl-row.odd{background:#ffffff;}'
     + '.tbl-row.pe-row td{background:#f0fdf4!important;}'
     + '.tbl-row.admin-row td{background:#eff6ff!important;border-top:2px solid #3b82f6!important;}'
-    + '.tbl-td-sub{font-weight:800;color:#0f766e;font-size:9px;border-right:2.5px solid #0f766e!important;}'
+    + '.tbl-td-sub{font-weight:800;color:#0f766e;font-size:10px;border-right:2.5px solid #0f766e!important;}'
     + '.tbl-td-sub.admin{color:#1d4ed8;border-right:2.5px solid #3b82f6!important;}'
     + '.tbl-td-sub.pe{color:#166534;border-right:2.5px solid #16a34a!important;}'
     + '.tbl-td-teacher{font-size:8px;color:#6b7280;}'
@@ -2733,37 +2741,44 @@ async function exportClassReports(cls){
 
 // توليد PDF لطالب واحد عبر iframe + print
 async function _generateStudentPDF(student){
-  return new Promise(function(resolve){
+  return new Promise(async function(resolve){
     try{
-      // بناء HTML التقرير
       var html = _buildReportHTML(student);
       if(!html){ resolve(null); return; }
 
-      // إنشاء iframe مخفي
+      // إنشاء iframe لعرض التقرير
       var iframe = document.createElement('iframe');
-      iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:297mm;height:210mm;border:none;visibility:hidden;';
+      iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1122px;height:794px;border:none;';
       document.body.appendChild(iframe);
-
-      var doc = iframe.contentDocument || iframe.contentWindow.document;
+      var doc = iframe.contentDocument||iframe.contentWindow.document;
       doc.open(); doc.write(html); doc.close();
 
-      setTimeout(function(){
-        try{
-          // نستخدم print للحصول على PDF blob عبر Blob API
-          // في المتصفحات الحديثة يمكن استخدام هذا الأسلوب
-          iframe.contentWindow.focus();
+      await new Promise(function(r){ setTimeout(r,500); });
 
-          // طريقة بديلة: نحفظ كـ HTML blob مع امتداد .pdf
-          // المتصفح سيعامله كـ HTML لكن الـ ZIP سيحمل الامتداد الصحيح
-          var blob = new Blob([html], {type: 'application/pdf'});
-          iframe.remove();
-          resolve(blob);
-        }catch(e){
-          iframe.remove();
-          resolve(null);
-        }
-      }, 400);
-    }catch(e){ resolve(null); }
+      // html2canvas → jsPDF
+      if(typeof html2canvas!=='undefined' && typeof window.jspdf!=='undefined'){
+        var canvas = await html2canvas(doc.body,{
+          scale:2, useCORS:true, allowTaint:true,
+          width:1122, height:794,
+          windowWidth:1122, windowHeight:794,
+          backgroundColor:'#ffffff'
+        });
+        var imgData = canvas.toDataURL('image/jpeg',0.95);
+        var pdf = new window.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+        pdf.addImage(imgData,'JPEG',0,0,297,210);
+        var blob = pdf.output('blob');
+        iframe.remove();
+        resolve(blob);
+      } else {
+        // fallback: HTML blob
+        var blob = new Blob([html],{type:'text/html;charset=utf-8'});
+        iframe.remove();
+        resolve(blob);
+      }
+    }catch(e){
+      console.error('PDF gen:',e);
+      resolve(null);
+    }
   });
 }
 
