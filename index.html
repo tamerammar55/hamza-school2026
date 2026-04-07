@@ -1879,7 +1879,7 @@ function renderParentReport(student){
   DB.teachers.forEach(t=>{
     if(!(t.classes||[]).includes(cls)) return;
     const items = getTeacherItems(t);
-    if(!items.length) return;
+    // نُظهر المادة دائماً حتى لو لم تُرصد بعد
     const rec   = REC[rKey(false, t.username, cls)] || {};
     const r     = rec[student.id] || {};
     const status= r.status || "—";
@@ -1967,7 +1967,7 @@ function renderParentReport(student){
   const subjectsHTML = sections.map(sec=>{
     const teacherNames = sec.teachers ? sec.teachers.join(" / ") : sec.name;
     const itemsHTML = sec.items.map((it,ci)=>{
-      const v = sec.absent ? "—" : (sec.scores[ci]!==undefined&&sec.scores[ci]!=="" ? sec.scores[ci] : "—");
+      const v = sec.absent ? "—" : (sec.scores[ci]!==undefined&&sec.scores[ci]!=="" ? sec.scores[ci] : "?");
       const display = it.type==="number" && v!=="—" ? v+" / "+it.max : v;
       return "<div class='cert-item'>"
         + "<div class='cert-item-name'>"+it.name+"</div>"
@@ -2077,14 +2077,14 @@ function exportStudentPDF(){
     + '<meta charset="UTF-8"><title>' + stuName + '</title>'
     + '<style>'
     + 'body{margin:0;font-family:Arial,sans-serif;direction:rtl;background:#fff;}'
-    + '@page{size:A4 landscape;margin:6mm;}'
-    + '.cert{border:2px solid #7c3aed;border-radius:8px;padding:10px 14px;position:relative;overflow:hidden;}'
-    + '.cert::before{content:"";position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#7c3aed,#1d6fa4,#1a9e5e);}'
-    + '.cert-hdr{text-align:center;margin-bottom:6px;padding-bottom:6px;border-bottom:1.5px dashed #e5e7eb;padding-top:4px;}'
-    + '.cert-school{font-size:13px;font-weight:900;color:#7c3aed;margin-bottom:2px;}'
-    + '.cert-title{font-size:10px;color:#6b7280;font-weight:600;}'
-    + '.cert-stu{background:linear-gradient(135deg,#faf5ff,#ede9fe);border-radius:7px;padding:5px 10px;margin-bottom:6px;display:flex;gap:10px;align-items:center;}'
-    + '.cert-stu-name{font-size:13px;font-weight:900;color:#7c3aed;}'
+    + '@page{size:A4 landscape;margin:4mm;}'
+    + '.cert{border:2px solid #7c3aed;border-radius:6px;padding:6px 10px;position:relative;overflow:hidden;}'
+    + '.cert::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#7c3aed,#1d6fa4,#1a9e5e);}'
+    + '.cert-hdr{text-align:center;margin-bottom:3px;padding-bottom:3px;border-bottom:1px dashed #e5e7eb;padding-top:2px;}'
+    + '.cert-school{font-size:11px;font-weight:900;color:#7c3aed;margin-bottom:1px;}'
+    + '.cert-title{font-size:9px;color:#6b7280;font-weight:600;}'
+    + '.cert-stu{background:linear-gradient(135deg,#faf5ff,#ede9fe);border-radius:5px;padding:3px 8px;margin-bottom:3px;display:flex;gap:8px;align-items:center;}'
+    + '.cert-stu-name{font-size:11px;font-weight:900;color:#7c3aed;}'
     + '.cert-stu-info{font-size:10px;color:#6b7280;}'
     + '.cert-subjects-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:5px;}'
     + '.cert-subject{border:1px solid #e5e7eb;border-radius:7px;overflow:hidden;}'
@@ -2094,7 +2094,7 @@ function exportStudentPDF(){
     + '.cert-item-name{font-size:8px;color:#6b7280;font-weight:600;margin-bottom:1px;}'
     + '.cert-item-val{font-size:11px;font-weight:900;color:#1a2332;}'
     + '.cert-grade{display:inline-block;padding:2px 7px;border-radius:20px;font-size:9px;font-weight:800;margin-top:2px;}'
-    + '.cert-footer{text-align:center;margin-top:6px;padding-top:5px;border-top:1px dashed #e5e7eb;font-size:9px;color:#6b7280;}'
+    + '.cert-footer{text-align:center;margin-top:3px;padding-top:3px;border-top:1px dashed #e5e7eb;font-size:8px;color:#6b7280;}'
     + '.cert-actions{display:none!important;}'
     + '</style></head><body>'
     + certHTML
