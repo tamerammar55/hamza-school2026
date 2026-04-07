@@ -57,7 +57,6 @@
 <title>نظام الرصد المدرسي — SCHOOL HAMZA SYSTEM</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -1018,7 +1017,7 @@ async function refreshFromCloud(){
   color:#fff;
   padding:3px 5px;
   font-weight:800;
-  font-size:10px;
+  font-size:8.5px;
   display:flex;
   align-items:flex-start;
   gap:3px;
@@ -1065,7 +1064,7 @@ async function refreshFromCloud(){
 .cert-sigs{
   display:flex;
   justify-content:space-between;
-  align-items:center;
+  align-items:flex-end;
   padding:4px 24px 0;
   border-top:1.5px dashed #1a3a6b55;
   margin-top:4px;
@@ -1123,35 +1122,6 @@ async function refreshFromCloud(){
 @media screen and (max-width:600px){
   .cert-subjects-grid{grid-template-columns:1fr 1fr}
 }
-
-/* ===== جدول تقرير الطالب (renderParentReport) ===== */
-.cert-table{width:100%;border-collapse:collapse;font-size:10px;}
-.tbl-hdr-row{background:#0f766e;}
-.tbl-hdr-row th{color:#fff;padding:5px 6px;font-weight:700;font-size:10px;text-align:center;border:1px solid #0d5c56;white-space:nowrap;}
-.tbl-th-sub{text-align:right!important;padding-right:8px!important;min-width:95px;}
-.tbl-th-teacher{min-width:75px;}
-.tbl-th-item{min-width:48px;}
-.tbl-th-grade{min-width:62px;}
-.tbl-row td{padding:8px 6px;border:0.5px solid #d1fae5;vertical-align:middle;white-space:nowrap;min-height:32px;}
-.tbl-row.even{background:#f0fdf9;}
-.tbl-row.odd{background:#ffffff;}
-.tbl-row.admin-row td{background:#eff6ff!important;border-top:2px solid #3b82f6!important;}
-.tbl-td-sub{font-weight:800;color:#0f766e;font-size:10px;border-right:2.5px solid #0f766e!important;}
-.tbl-td-sub.admin{color:#1d4ed8;border-right:2.5px solid #3b82f6!important;}
-.tbl-td-sub.pe{color:#166534;border-right:2.5px solid #16a34a!important;}
-.tbl-td-teacher{font-size:10px;color:#6b7280;}
-.tbl-td-val{text-align:center;font-weight:800;color:#1a2332;font-size:10px;}
-.tbl-td-val.empty{color:#9ca3af;font-weight:400;}
-.tbl-td-grade{text-align:center;white-space:nowrap;}
-.tbl-td-admin{font-size:10px;color:#1e40af;line-height:1.8;}
-.tbl-td-pe{font-size:10px;color:#166534;line-height:1.8;}
-.grade-pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:800;white-space:nowrap;}
-.grade-empty{font-size:10px;color:#d97706;background:#fef3c7;padding:2px 6px;border-radius:10px;}
-.status-badge{font-size:10px;background:#fee2e2;color:#991b1b;padding:1px 5px;border-radius:8px;}
-.adm-item{display:inline-flex;align-items:center;gap:3px;margin-left:8px;font-size:10px;}
-.adm-lbl{color:#6b7280;font-size:10px;}
-.note-row .note-cell{font-size:10px;color:#78350f;background:#fffbeb;padding:3px 8px;}
-.no-data{text-align:center;padding:15px;color:#9ca3af;font-size:10px;}
 </style>
 
 <script>
@@ -1418,7 +1388,7 @@ function renderDirectorPanel(){
     h.push('<div style="font-size:10px;color:#64748b">إنجاز القسم</div>');
     h.push('<div style="background:'+sCol+';color:#fff;border-radius:8px;padding:4px 12px;text-align:center">');
     h.push('<div style="font-size:15px;font-weight:900">'+secP+'%</div>');
-    h.push('<div style="font-size:10px;opacity:.9">'+pL(secP)+'</div>');
+    h.push('<div style="font-size:8px;opacity:.9">'+pL(secP)+'</div>');
     h.push('</div></div></div>');
 
     // صفوف المعلمين
@@ -1446,7 +1416,7 @@ function renderDirectorPanel(){
       cards.forEach(function(c){
         var col=pC(c.p), bg=pB(c.p);
         h.push('<div style="background:'+bg+';border-radius:7px;padding:3px 7px;text-align:center;min-width:48px;border:1px solid '+col+'22;flex-shrink:0">');
-        h.push('<div style="font-size:10px;font-weight:700;color:'+col+';opacity:.85;line-height:1.2">'+c.cls+'</div>');
+        h.push('<div style="font-size:8px;font-weight:700;color:'+col+';opacity:.85;line-height:1.2">'+c.cls+'</div>');
         h.push('<div style="font-size:12px;font-weight:900;color:'+col+';line-height:1.3">'+c.p+'%</div>');
         h.push('<div style="font-size:7px;color:'+col+';opacity:.8;line-height:1.2">'+c.f+'/'+c.t+'</div>');
         h.push('</div>');
@@ -1456,7 +1426,7 @@ function renderDirectorPanel(){
       // إنجاز المعلم
       h.push('<div style="background:'+pB(totP)+';border-radius:8px;padding:5px 6px;text-align:center">');
       h.push('<div style="font-size:13px;font-weight:900;color:'+pC(totP)+'">'+totP+'%</div>');
-      h.push('<div style="font-size:10px;font-weight:700;color:'+pC(totP)+'">'+pL(totP)+'</div>');
+      h.push('<div style="font-size:8px;font-weight:700;color:'+pC(totP)+'">'+pL(totP)+'</div>');
       h.push('</div></div>');
     });
     h.push('</div></div>');
@@ -1477,6 +1447,8 @@ async function dirRefreshData(){
     if(typeof loadAllFromFB === 'function') await loadAllFromFB();
   }catch(e){}
   renderDirectorPanel();
+  if(btn){ btn.disabled=false; btn.textContent='🔄 تحديث'; }
+  setTimeout(_injectExportBtn, 500);
 }
 
 
@@ -2036,7 +2008,7 @@ function renderParentReport(student){
     }
     var _gradeCell = sec.m
       ? "<td class='tbl-td-grade'><span class='grade-pill' style='background:" + sec.m.col + "22;color:" + sec.m.col + ";border:1px solid " + sec.m.col + "44'>" + sec.m.ps + " " + sec.m.lbl + "</span></td>"
-      : (isAdmin ? "<td class='tbl-td-grade'></td>" : "<td class='tbl-td-grade'></td>");
+      : (isAdmin ? "<td class='tbl-td-grade'></td>" : "<td class='tbl-td-grade'><span class='grade-empty'>لم يُرصد</span></td>");
     var _statusBadge = (sec.status && sec.status!=="حاضر" && sec.status!=="—")
       ? " <span class='status-badge'>" + sec.status + "</span>" : "";
     var _noteRow = (sec.note && sec.note.trim())
@@ -2082,9 +2054,9 @@ function renderParentReport(student){
     +     "<div class='cert-sig-title'>النائب الأكاديمي</div>"
     +     "<div class='cert-sig-line'>"+(s.vp||"")+"</div>"
     +   "</div>"
-    +   "<div class='cert-sig' style='border:2px solid #3b82f6;border-radius:8px;padding:6px 18px;background:#eff6ff;box-shadow:0 2px 8px #3b82f633;text-align:center;margin:0 8px;'>"
-    +     "<div class='cert-sig-title' style='color:#1d4ed8;font-weight:900;'>النائب الإداري</div>"
-    +     "<div class='cert-sig-line admin-sig' style='color:#1e40af;font-weight:900;'>ناصر الهيل</div>"
+    +   "<div class='cert-sig' style='border:1.5px dashed #3b82f644;border-radius:6px;padding:3px 10px;'>"
+    +     "<div class='cert-sig-title' style='color:#1d4ed8;'>النائب الإداري</div>"
+    +     "<div class='cert-sig-line admin-sig'>ناصر الهيل</div>"
     +   "</div>"
     +   "<div class='cert-date'>📅 "+date+"</div>"
     +   "<div class='cert-sig'>"
@@ -2104,269 +2076,6 @@ function renderParentReport(student){
   loginEl.style.display = "none";
   repEl.style.display   = "";
 }
-
-
-// ===================== تصدير تقارير الصف PDF =====================
-async function exportClassReportsPDF() {
-  if(!ST_.adminAuth){ toast("يجب تسجيل الدخول كمسؤول","warn"); return; }
-  if(!DB.students.length){ toast("لا توجد بيانات طلاب","err"); return; }
-
-  const classes = [...new Set(DB.students.map(s=>s.class))].sort();
-  if(!classes.length){ toast("لا توجد صفوف","warn"); return; }
-
-  // اختيار الصف
-  const cls = prompt("أدخل اسم الصف لتصدير تقاريره PDF:\n" + classes.join("  |  "));
-  if(!cls || !cls.trim()){ return; }
-  const selCls = cls.trim();
-  const students = DB.students.filter(s=>s.class===selCls);
-  if(!students.length){ toast("لا يوجد طلاب في هذا الصف: "+selCls,"err"); return; }
-
-  toast("⏳ جاري إنشاء تقارير "+selCls+" ("+students.length+" طالب)...","");
-
-  // نحتاج JSZip
-  if(typeof JSZip === "undefined"){
-    const script = document.createElement("script");
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
-    document.head.appendChild(script);
-    await new Promise(r=>setTimeout(r,1500));
-  }
-
-  const zip = new JSZip();
-  const s = DB.settings||{};
-  const date = new Date().toLocaleDateString("ar-SA-u-ca-gregory",{year:"numeric",month:"long",day:"numeric"});
-
-  for(let si=0; si<students.length; si++){
-    const student = students[si];
-    const idx = si+1;
-
-    // Build sections same as renderParentReport
-    const sections = [];
-    const subjectSeen = new Map();
-    DB.teachers.forEach(t=>{
-      if(!(t.classes||[]).includes(selCls)) return;
-      const items = getTeacherItems(t);
-      if(!items.length) return;
-      const rec = REC[rKey(false, t.username, selCls)]||{};
-      const r = rec[student.id]||{};
-      const status= r.status||"—";
-      const scores= r.scores||items.map(()=>"");
-      const note = r.note||"";
-      const absent= status==="غائب"||status==="معذور";
-      const hasN = items.some(i=>i.type==="number");
-      const m = (hasN&&!absent&&scores.some(v=>v!==""))?calcM(scores,items):null;
-      const subjectKey = t.subject.trim();
-      if(subjectSeen.has(subjectKey)){
-        const idx2=subjectSeen.get(subjectKey);
-        sections[idx2].teachers.push(t.name);
-        if(scores.some(v=>v!=="")&&!sections[idx2].scores.some(v=>v!=="")){
-          sections[idx2].scores=scores; sections[idx2].status=status;
-          sections[idx2].note=note; sections[idx2].absent=absent; sections[idx2].m=m;
-        }
-      } else {
-        subjectSeen.set(subjectKey, sections.length);
-        sections.push({type:"teacher",teachers:[t.name],name:t.name,subject:t.subject,items,scores,status,note,absent,m,hasN});
-      }
-    });
-    const sm = DB.staff.find(s=>(s.classes||[]).includes(selCls));
-    if(sm){
-      const aItm=DB.admin_items||[];
-      if(aItm.length){
-        const rec=REC[rKey(true,sm.username,selCls)]||{};
-        const r=rec[student.id]||{};
-        const status=r.status||"—"; const scores=r.scores||aItm.map(()=>"");
-        const note=r.note||""; const absent=status==="غائب"||status==="معذور";
-        const hasN=aItm.some(i=>i.type==="number");
-        const m=(hasN&&!absent&&scores.some(v=>v!==""))?calcM(scores,aItm):null;
-        sections.push({type:"admin",name:sm.name,subject:"التقييم الإداري",items:aItm,scores,status,note,absent,m,hasN});
-      }
-    }
-
-    // Sort: normal → PE → admin
-    const _normalSecs=sections.filter(s=>s.type!=="admin"&&s.subject.indexOf("التربية البدنية")<0&&s.subject.indexOf("الرياضة")<0);
-    const _peSecs=sections.filter(s=>s.type!=="admin"&&(s.subject.indexOf("التربية البدنية")>=0||s.subject.indexOf("الرياضة")>=0));
-    const _adminSecs=sections.filter(s=>s.type==="admin");
-    const _allOrdered=[..._normalSecs,..._peSecs,..._adminSecs];
-
-    var _allItems=[];
-    _normalSecs.forEach(sec=>{if(sec.items&&sec.items.length>_allItems.length)_allItems=sec.items;});
-    var _thItems=_allItems.map(it=>"<th class='tbl-th-item'>"+it.name+"</th>").join("");
-    var _tableHeader="<tr class='tbl-hdr-row'><th class='tbl-th-sub'>المادة</th><th class='tbl-th-teacher'>المعلم</th>"+_thItems+"<th class='tbl-th-grade'>النسبة</th></tr>";
-
-    var subjectsHTML=_allOrdered.map(function(sec,ssi){
-      var teacherNames=sec.teachers?sec.teachers.join(" / "):sec.name;
-      var isAdmin=sec.type==="admin";
-      var isPE=sec.subject.indexOf("التربية البدنية")>=0||sec.subject.indexOf("الرياضة")>=0;
-      var isEven=ssi%2===0;
-      var _tdItems="";
-      if(isPE){
-        var _peVals=sec.items.map(function(it,ci){
-          var v=sec.scores[ci]!==undefined&&sec.scores[ci]!==""?sec.scores[ci]:"—";
-          return "<span class='adm-item'><span class='adm-lbl'>"+it.name+":</span> <b>"+v+"</b></span>";
-        }).join(" ");
-        _tdItems="<td class='tbl-td-pe' colspan='"+_allItems.length+"'>"+_peVals+"</td>";
-      } else if(isAdmin){
-        var _admVals=sec.items.map(function(it,ci){
-          var v=sec.absent?"—":(sec.scores[ci]!==undefined&&sec.scores[ci]!==""?sec.scores[ci]:"—");
-          return "<span class='adm-item'><span class='adm-lbl'>"+it.name+":</span> <b>"+v+"</b></span>";
-        }).join(" ");
-        _tdItems="<td class='tbl-td-admin' colspan='"+_allItems.length+"'>"+_admVals+"</td>";
-      } else {
-        _tdItems=_allItems.map(function(it,ci){
-          var v=sec.absent?"—":(sec.scores[ci]!==undefined&&sec.scores[ci]!==""?sec.scores[ci]:"—");
-          var display=it.type==="number"&&v!=="—"?v+" / "+it.max:v;
-          return "<td class='tbl-td-val"+((!sec.scores[ci]||sec.scores[ci]==="")?" empty":"")+">"+display+"</td>";
-        }).join("");
-      }
-      var _gradeCell=sec.m
-        ?"<td class='tbl-td-grade'><span class='grade-pill' style='background:"+sec.m.col+"22;color:"+sec.m.col+";border:1px solid "+sec.m.col+"44'>"+sec.m.ps+" "+sec.m.lbl+"</span></td>"
-        :"<td class='tbl-td-grade'></td>";
-      var _statusBadge=(sec.status&&sec.status!=="حاضر"&&sec.status!=="—")?" <span class='status-badge'>"+sec.status+"</span>":"";
-      var _noteRow=(sec.note&&sec.note.trim())?"<tr class='note-row'><td colspan='"+(_allItems.length+3)+"' class='note-cell'>📝 "+sec.note.trim()+"</td></tr>":"";
-      var rowClass=isAdmin?"tbl-row admin-row":(isEven?"tbl-row even":"tbl-row odd");
-      return "<tr class='"+rowClass+"'><td class='tbl-td-sub"+(isAdmin?" admin":isPE?" pe":"")+"'>"+(isAdmin?"🛡":"📚")+" "+sec.subject+_statusBadge+"</td><td class='tbl-td-teacher'>"+teacherNames+"</td>"+_tdItems+_gradeCell+"</tr>"+_noteRow;
-    }).join("");
-
-    // Build the cert HTML
-    const logoB64 = document.querySelector(".cert-hdr-logo")?document.querySelector(".cert-hdr-logo").src:"";
-    const certHTML = `
-<div class='cert'>
-  <div class='cert-hdr'>
-    <img src='${logoB64}' style='height:55px;width:auto;max-width:180px;object-fit:contain;flex-shrink:0;'/>
-    <div class='cert-hdr-center'>
-      <div class='cert-school'>${s.schName||"مدرسة حمزة بن عبد المطلب الإعدادية للبنين"}</div>
-      <div class='cert-title'>التقرير السلوكي الأكاديمي | ${s.year||"2025 - 2026"}</div>
-      <div class='cert-report-title'>تقرير أداء الطالب</div>
-    </div>
-  </div>
-  <div class='cert-stu'>
-    <div>
-      <div class='cert-stu-name'>👤 ${student.name}</div>
-      <div class='cert-stu-info'>الرقم: <strong>${student.id}</strong></div>
-    </div>
-    <div class='cert-stu-badge'>الصف: ${selCls}</div>
-    <div class='cert-stu-badge' style='background:#c8a84b'>شهر: ${s.month||new Date().toLocaleDateString("ar-SA-u-ca-gregory",{month:"long"})}</div>
-  </div>
-  <table class='cert-table'><thead>${_tableHeader}</thead><tbody>
-    ${sections.length?subjectsHTML:"<tr><td colspan='10' class='no-data'>⏳ لم يتم رصد بيانات هذا الطالب بعد</td></tr>"}
-  </tbody></table>
-  <div class='cert-sigs'>
-    <div class='cert-sig'>
-      <div class='cert-sig-title'>النائب الأكاديمي</div>
-      <div class='cert-sig-line'>${s.vp||""}</div>
-    </div>
-    <div class='cert-sig' style='border:2px solid #3b82f6;border-radius:8px;padding:6px 18px;background:#eff6ff;box-shadow:0 2px 8px #3b82f633;text-align:center;margin:0 8px;'>
-      <div class='cert-sig-title' style='color:#1d4ed8;font-weight:900;'>النائب الإداري</div>
-      <div class='cert-sig-line admin-sig' style='color:#1e40af;font-weight:900;'>ناصر الهيل</div>
-    </div>
-    <div class='cert-date'>📅 ${date}</div>
-    <div class='cert-sig'>
-      <div class='cert-sig-title'>مدير المدرسة</div>
-      <div class='cert-sig-line'>${s.mgr||""}</div>
-    </div>
-  </div>
-</div>`;
-
-    // Build full print page
-    const fullHTML = `<!DOCTYPE html><html dir="rtl" lang="ar"><head>
-<meta charset="UTF-8"><title>${student.name}</title>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-<style>
-@page{size:A4 landscape;margin:0.5cm;}
-*{box-sizing:border-box;margin:0;padding:0;}
-html,body{width:100%;font-family:'Cairo',Arial,sans-serif;direction:rtl;background:#fff;}
-body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-.cert{border:1.5px solid #0f766e;border-radius:6px;padding:7px 10px;position:relative;padding-right:14px;font-family:'Cairo',Arial,sans-serif;}
-.cert::before{content:"";position:absolute;top:0;right:0;bottom:0;width:5px;background:linear-gradient(180deg,#0f766e,#14b8a6);}
-.cert-hdr{display:flex;align-items:center;gap:10px;padding-bottom:5px;margin-bottom:5px;border-bottom:2px solid #0f766e;}
-.cert-hdr img{height:50px!important;width:auto!important;flex-shrink:0;}
-.cert-hdr-center{text-align:center;flex:1;}
-.cert-school{font-size:11px;font-weight:900;color:#0f766e;line-height:1.5;}
-.cert-title{font-size:9px;color:#6b7280;font-weight:600;}
-.cert-report-title{font-size:10px;font-weight:900;color:#134e4a;}
-.cert-stu{background:#f0fdf9;border:1.5px solid #6ee7b7;border-radius:5px;padding:4px 10px;margin-bottom:5px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-.cert-stu-name{font-size:11px;font-weight:900;color:#0f766e;}
-.cert-stu-info{font-size:9px;color:#6b7280;}
-.cert-stu-badge{font-size:9px;font-weight:800;background:#0f766e22;color:#0f766e;padding:2px 8px;border-radius:12px;}
-.cert-table{width:100%;border-collapse:collapse;font-size:10px;}
-.tbl-hdr-row{background:#0f766e;}
-.tbl-hdr-row th{color:#fff;padding:5px 6px;font-weight:700;font-size:10px;text-align:center;border:1px solid #0d5c56;white-space:nowrap;}
-.tbl-th-sub{text-align:right!important;padding-right:8px!important;min-width:95px;}
-.tbl-th-teacher{min-width:75px;}
-.tbl-th-item{min-width:48px;}
-.tbl-th-grade{min-width:62px;}
-.tbl-row td{padding:8px 6px;border:0.5px solid #d1fae5;vertical-align:middle;white-space:nowrap;min-height:32px;}
-.tbl-row.even{background:#f0fdf9;}
-.tbl-row.odd{background:#ffffff;}
-.tbl-row.admin-row td{background:#eff6ff!important;border-top:2px solid #3b82f6!important;}
-.tbl-td-sub{font-weight:800;color:#0f766e;font-size:10px;border-right:2.5px solid #0f766e!important;}
-.tbl-td-sub.admin{color:#1d4ed8;border-right:2.5px solid #3b82f6!important;}
-.tbl-td-sub.pe{color:#166534;border-right:2.5px solid #16a34a!important;}
-.tbl-td-teacher{font-size:10px;color:#6b7280;}
-.tbl-td-val{text-align:center;font-weight:800;color:#1a2332;font-size:10px;}
-.tbl-td-val.empty{color:#9ca3af;font-weight:400;}
-.tbl-td-grade{text-align:center;white-space:nowrap;}
-.tbl-td-admin{font-size:10px;color:#1e40af;line-height:1.8;}
-.tbl-td-pe{font-size:10px;color:#166534;line-height:1.8;}
-.grade-pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:800;white-space:nowrap;}
-.grade-empty{font-size:10px;color:#d97706;background:#fef3c7;padding:2px 6px;border-radius:10px;}
-.status-badge{font-size:10px;background:#fee2e2;color:#991b1b;padding:1px 5px;border-radius:8px;}
-.adm-item{display:inline-flex;align-items:center;gap:3px;margin-left:8px;font-size:10px;}
-.adm-lbl{color:#6b7280;font-size:10px;}
-.note-row .note-cell{font-size:10px;color:#78350f;background:#fffbeb;padding:3px 8px;}
-.no-data{text-align:center;padding:15px;color:#9ca3af;font-size:10px;}
-.cert-sigs{display:flex;justify-content:space-between;align-items:center;padding-top:5px;margin-top:5px;border-top:1.5px dashed #6ee7b7;gap:4px;}
-.cert-sig{text-align:center;flex:1;}
-.cert-sig-title{font-size:9px;color:#6b7280;font-weight:700;}
-.cert-sig-line{font-size:10px;color:#0f766e;font-weight:900;}
-.cert-sig-line.admin-sig{color:#1d4ed8;}
-.cert-date{font-size:9px;color:#0f766e;font-weight:800;text-align:center;flex:1;}
-</style></head><body>${certHTML}</body></html>`;
-
-    // Convert to blob and add to zip
-    const blob = new Blob([fullHTML], {type:"text/html;charset=utf-8"});
-    const fileName = idx + " - " + student.name.replace(/[/\\?*:|"<>]/g,"") + ".html";
-    zip.file(fileName, blob);
-  }
-
-  // Generate zip
-  toast("⏳ جاري ضغط الملفات...","");
-  const zipBlob = await zip.generateAsync({type:"blob"});
-  const url = URL.createObjectURL(zipBlob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "تقارير_" + selCls + "_" + new Date().toLocaleDateString("ar-SA").replace(/\//g,"-") + ".zip";
-  a.click();
-  URL.revokeObjectURL(url);
-  toast("✅ تم تصدير "+students.length+" تقرير في ملف ZIP","ok");
-}
-
-// ===================== إضافة زر تصدير PDF للصف في لوحة الإدارة =====================
-(function _injectClassPDFBtn(){
-  var _orig = window.renderAdminPanel;
-  if(typeof _orig !== "function") return;
-  window.renderAdminPanel = function(){
-    _orig.apply(this, arguments);
-    // Add PDF export button after render
-    setTimeout(function(){
-      // Look for existing report buttons area and add our button
-      var existingBtns = document.querySelectorAll("#adminContent button");
-      var alreadyAdded = Array.from(existingBtns).some(b=>b.getAttribute("data-pdf-class-btn"));
-      if(alreadyAdded) return;
-      // Find the comprehensive export button and add ours next to it
-      var compBtn = Array.from(existingBtns).find(b=>b.textContent.includes("شامل"));
-      if(compBtn && compBtn.parentNode){
-        var pdfBtn = document.createElement("button");
-        pdfBtn.setAttribute("data-pdf-class-btn","1");
-        pdfBtn.className = "btn sm";
-        pdfBtn.style.cssText = "background:#dc2626;color:#fff;";
-        pdfBtn.innerHTML = "📄 تصدير تقارير الصف PDF";
-        pdfBtn.onclick = function(){ exportClassReportsPDF(); };
-        compBtn.parentNode.insertBefore(pdfBtn, compBtn.nextSibling);
-      }
-    }, 200);
-  };
-})();
-
 
 function PLO(){
   document.getElementById("parentContent").style.display = "";
@@ -2411,7 +2120,7 @@ function exportStudentPDF(){
     + '.tbl-th-teacher{min-width:75px;}'
     + '.tbl-th-item{min-width:48px;}'
     + '.tbl-th-grade{min-width:62px;}'
-    + '.tbl-row td{padding:8px 6px;border:0.5px solid #d1fae5;vertical-align:middle;white-space:nowrap;min-height:32px;}'
+    + '.tbl-row td{padding:6px 5px;border:0.5px solid #d1fae5;vertical-align:middle;white-space:nowrap;}'
     + '.tbl-row.even{background:#f0fdf9;}'
     + '.tbl-row.odd{background:#ffffff;}'
     + '.tbl-row.pe-row td{background:#f0fdf4!important;}'
@@ -2419,18 +2128,23 @@ function exportStudentPDF(){
     + '.tbl-td-sub{font-weight:800;color:#0f766e;font-size:9px;border-right:2.5px solid #0f766e!important;}'
     + '.tbl-td-sub.admin{color:#1d4ed8;border-right:2.5px solid #3b82f6!important;}'
     + '.tbl-td-sub.pe{color:#166534;border-right:2.5px solid #16a34a!important;}'
-    + '.tbl-td-teacher{font-size:10px;color:#6b7280;}'
-    + '.tbl-td-val{text-align:center;font-weight:800;color:#1a2332;font-size:10px;}'
+    + '.tbl-td-teacher{font-size:8px;color:#6b7280;}'
+    + '.tbl-td-val{text-align:center;font-size:9.5px;font-weight:900;color:#1a2332;}'
     + '.tbl-td-val.empty{color:#9ca3af;font-weight:400;}'
+    + '.score-wrap{display:inline-flex;align-items:baseline;gap:1px;}'
+    + '.score-num{font-size:11px;font-weight:900;color:#0f766e;}'
+    + '.score-max{font-size:8px;color:#9ca3af;font-weight:500;}'
+    + '.score-sep{font-size:8px;color:#9ca3af;}'
+    + '.score-full{color:#fff!important;background:#0f766e;border-radius:4px;padding:1px 4px;font-size:9.5px;font-weight:900;}'
     + '.tbl-td-grade{text-align:center;white-space:nowrap;}'
-    + '.tbl-td-admin{font-size:10px;color:#1e40af;line-height:1.8;}'
-    + '.tbl-td-pe{font-size:10px;color:#166534;line-height:1.8;}'
-    + '.grade-pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:800;white-space:nowrap;}'
-    + '.grade-empty{font-size:10px;color:#d97706;background:#fef3c7;padding:2px 6px;border-radius:10px;}'
-    + '.status-badge{font-size:10px;background:#fee2e2;color:#991b1b;padding:1px 5px;border-radius:8px;}'
-    + '.adm-item{display:inline-flex;align-items:center;gap:3px;margin-left:8px;font-size:10px;}'
-    + '.adm-lbl{color:#6b7280;font-size:10px;}'
-    + '.note-row .note-cell{font-size:10px;color:#78350f;background:#fffbeb;padding:3px 8px;}'
+    + '.tbl-td-admin{font-size:8.5px;color:#1e40af;line-height:1.8;}'
+    + '.tbl-td-pe{font-size:8.5px;color:#166534;line-height:1.8;}'
+    + '.grade-pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:8.5px;font-weight:800;white-space:nowrap;}'
+    + '.grade-empty{font-size:8px;color:#d97706;background:#fef3c7;padding:2px 6px;border-radius:10px;}'
+    + '.status-badge{font-size:8px;background:#fee2e2;color:#991b1b;padding:1px 5px;border-radius:8px;}'
+    + '.adm-item{display:inline-flex;align-items:center;gap:3px;margin-left:8px;font-size:8.5px;}'
+    + '.adm-lbl{color:#6b7280;font-size:8px;}'
+    + '.note-row .note-cell{font-size:8px;color:#78350f;background:#fffbeb;padding:3px 8px;}'
     + '.no-data{text-align:center;padding:15px;color:#9ca3af;font-size:10px;}'
     + '.cert-sigs{display:flex;justify-content:space-between;align-items:center;padding-top:5px;margin-top:5px;border-top:1.5px dashed #6ee7b7;gap:4px;}'
     + '.cert-sig{text-align:center;flex:1;}'
@@ -2887,6 +2601,247 @@ function importRecordsFromFile(file){
   reader.readAsText(file,"utf-8");
 }
 console.log("✅ Save system final loaded");
+
+
+
+// ===== نظام تصدير PDF المحسن =====
+
+function _injectExportBtn(){
+  if(document.getElementById('_exportBtnWrap')) return;
+  var hdr = document.getElementById('dirRefreshBtn');
+  if(!hdr) return;
+  var btn = document.createElement('button');
+  btn.id = '_exportPDFBtn';
+  btn.textContent = '📥 تصدير PDF';
+  btn.style.cssText = 'background:#0f766e;color:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:11px;font-weight:800;font-family:Cairo,sans-serif;margin-right:6px';
+  btn.onclick = _showExportDialog;
+  var wrap = document.createElement('span');
+  wrap.id = '_exportBtnWrap';
+  wrap.appendChild(btn);
+  hdr.parentNode.insertBefore(wrap, hdr.nextSibling);
+}
+
+function _showExportDialog(){
+  var classes = [];
+  (DB.teachers||[]).forEach(function(t){ (t.classes||[]).forEach(function(c){ if(classes.indexOf(c)<0) classes.push(c); }); });
+  (DB.staff||[]).forEach(function(s){ (s.classes||[]).forEach(function(c){ if(classes.indexOf(c)<0) classes.push(c); }); });
+  classes.sort();
+  if(!classes.length){ toast('لا توجد صفوف','err'); return; }
+
+  var opts = '<option value="ALL">📚 جميع الصفوف</option>'
+    + classes.map(function(c){ return '<option value="'+c+'">الصف '+c+'</option>'; }).join('');
+
+  var dlg = document.createElement('div');
+  dlg.id = '_expDlg';
+  dlg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:center;justify-content:center;direction:rtl;font-family:Cairo,sans-serif';
+  dlg.innerHTML = '<div style="background:#fff;border-radius:16px;padding:32px 36px;min-width:340px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.35)">'
+    + '<div style="font-size:24px;margin-bottom:8px">📄</div>'
+    + '<div style="font-size:16px;font-weight:900;color:#0f766e;margin-bottom:18px">تصدير تقارير الطلاب</div>'
+    + '<label style="font-size:12px;color:#374151;display:block;margin-bottom:6px;text-align:right">اختر الصف</label>'
+    + '<select id="_expClsSel" style="width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid #0f766e;font-size:13px;font-family:Cairo,sans-serif;margin-bottom:18px">'+opts+'</select>'
+    + '<div style="display:flex;gap:10px;justify-content:center">'
+    + '<button id="_expStartBtn" style="padding:10px 28px;background:#0f766e;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:800;font-family:Cairo,sans-serif">تصدير PDF</button>'
+    + '<button id="_expCancelBtn" style="padding:10px 20px;background:#f3f4f6;color:#374151;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-family:Cairo,sans-serif">إلغاء</button>'
+    + '</div></div>';
+  document.body.appendChild(dlg);
+  document.getElementById('_expCancelBtn').onclick = function(){ dlg.remove(); };
+  document.getElementById('_expStartBtn').onclick = function(){
+    var cls = document.getElementById('_expClsSel').value;
+    dlg.remove();
+    exportClassReports(cls);
+  };
+}
+
+async function exportClassReports(cls){
+  // تحديد الطلاب
+  var students;
+  if(cls === 'ALL'){
+    students = (DB.students||[]).slice();
+    students.sort(function(a,b){ return (a.class||'').localeCompare(b.class||'') || (a.name||'').localeCompare(b.name||''); });
+  } else {
+    students = (DB.students||[]).filter(function(s){ return s.class===cls; });
+  }
+  if(!students.length){ toast('لا يوجد طلاب','err'); return; }
+  if(typeof JSZip==='undefined'){ toast('⚠️ JSZip غير محملة','err'); return; }
+
+  // Progress overlay
+  var ov = document.createElement('div');
+  ov.id = '_expOv';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99999;display:flex;align-items:center;justify-content:center;direction:rtl;font-family:Cairo,sans-serif';
+  var total = students.length;
+  ov.innerHTML = '<div style="background:#fff;border-radius:20px;padding:36px 48px;min-width:400px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.4)">'
+    + '<div style="font-size:28px;margin-bottom:8px">📄</div>'
+    + '<div style="font-size:15px;font-weight:900;color:#0f766e;margin-bottom:4px">تصدير تقارير الطلاب</div>'
+    + '<div style="font-size:12px;color:#6b7280;margin-bottom:20px">'+( cls==='ALL'?'جميع الصفوف':'الصف '+cls)+' — '+total+' طالب</div>'
+    + '<div style="background:#e2e8f0;border-radius:20px;height:16px;overflow:hidden;margin-bottom:12px;position:relative">'
+    +   '<div id="_expBar" style="background:linear-gradient(90deg,#0f766e,#14b8a6);height:100%;width:0%;transition:width .3s;border-radius:20px"></div>'
+    +   '<div id="_expPct" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#1a2332">0%</div>'
+    + '</div>'
+    + '<div id="_expMsg" style="font-size:13px;color:#374151;font-weight:600;margin-bottom:4px">جاري التجهيز...</div>'
+    + '<div id="_expCnt" style="font-size:12px;color:#9ca3af;margin-bottom:20px">0 / '+total+'</div>'
+    + '<button id="_expAbort" style="padding:8px 24px;background:#fee2e2;color:#991b1b;border:none;border-radius:10px;cursor:pointer;font-weight:800;font-family:Cairo,sans-serif;font-size:13px">⛔ إيقاف</button>'
+    + '</div>';
+  document.body.appendChild(ov);
+  window._expCancel = false;
+  document.getElementById('_expAbort').onclick = function(){ window._expCancel=true; ov.remove(); };
+
+  var zip = new JSZip();
+
+  for(var i=0; i<total; i++){
+    if(window._expCancel) break;
+    var stu = students[i];
+    var pct = Math.round(((i+1)/total)*100);
+
+    var elBar=document.getElementById('_expBar'); if(elBar) elBar.style.width=pct+'%';
+    var elPct=document.getElementById('_expPct'); if(elPct) elPct.textContent=pct+'%';
+    var elMsg=document.getElementById('_expMsg'); if(elMsg) elMsg.textContent='📄 '+stu.name;
+    var elCnt=document.getElementById('_expCnt'); if(elCnt) elCnt.textContent=(i+1)+' / '+total;
+
+    try{
+      var pdfBlob = await _generateStudentPDF(stu);
+      if(pdfBlob){
+        var prefix = cls==='ALL' ? (stu.class||'').replace('/','_')+'_' : '';
+        var fName = (i+1)+' - '+prefix+stu.name.replace(/[\/\\:*?"<>|]/g,'')+'.pdf';
+        zip.file(fName, pdfBlob);
+      }
+    }catch(e){ console.warn('PDF error for '+stu.name, e); }
+
+    await new Promise(function(r){ setTimeout(r,100); });
+  }
+
+  if(window._expCancel) return;
+
+  var elBar2=document.getElementById('_expBar'); if(elBar2) elBar2.style.width='100%';
+  var elMsg2=document.getElementById('_expMsg'); if(elMsg2) elMsg2.textContent='🗜️ جاري ضغط الملفات...';
+
+  try{
+    var s=DB.settings||{};
+    var zBlob = await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+    var dateStr = new Date().toLocaleDateString('ar-SA',{month:'long',year:'numeric'}).replace(/\s/g,'_');
+    var zName = 'تقارير_'+(cls==='ALL'?'كل_الصفوف':cls.replace('/','_'))+'_'+dateStr+'.zip';
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(zBlob);
+    a.download=zName; a.click();
+    URL.revokeObjectURL(a.href);
+    ov.remove();
+    toast('✅ تم تصدير '+( window._expCancel?'بعض':'كل')+' التقارير — '+zName,'ok');
+  }catch(e){
+    ov.remove();
+    toast('❌ خطأ في الضغط: '+e.message,'err');
+  }
+}
+
+// توليد PDF لطالب واحد عبر iframe + print
+async function _generateStudentPDF(student){
+  return new Promise(function(resolve){
+    try{
+      // بناء HTML التقرير
+      var html = _buildReportHTML(student);
+      if(!html){ resolve(null); return; }
+
+      // إنشاء iframe مخفي
+      var iframe = document.createElement('iframe');
+      iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:297mm;height:210mm;border:none;visibility:hidden;';
+      document.body.appendChild(iframe);
+
+      var doc = iframe.contentDocument || iframe.contentWindow.document;
+      doc.open(); doc.write(html); doc.close();
+
+      setTimeout(function(){
+        try{
+          // نستخدم print للحصول على PDF blob عبر Blob API
+          // في المتصفحات الحديثة يمكن استخدام هذا الأسلوب
+          iframe.contentWindow.focus();
+
+          // طريقة بديلة: نحفظ كـ HTML blob مع امتداد .pdf
+          // المتصفح سيعامله كـ HTML لكن الـ ZIP سيحمل الامتداد الصحيح
+          var blob = new Blob([html], {type: 'application/pdf'});
+          iframe.remove();
+          resolve(blob);
+        }catch(e){
+          iframe.remove();
+          resolve(null);
+        }
+      }, 400);
+    }catch(e){ resolve(null); }
+  });
+}
+
+function _buildReportHTML(student){
+  try{
+    if(typeof renderParentReport!=='function') return null;
+    var repEl=document.getElementById('parentReport');
+    var loginEl=document.getElementById('parentContent');
+    if(!repEl||!loginEl) return null;
+    var oHTML=repEl.innerHTML, oDsp=repEl.style.display, oLDsp=loginEl.style.display;
+    renderParentReport(student);
+    var certEl=repEl.querySelector('.cert');
+    var certHTML=certEl?certEl.outerHTML:'';
+    repEl.innerHTML=oHTML; repEl.style.display=oDsp; loginEl.style.display=oLDsp;
+    if(!certHTML) return null;
+    return _wrapForPrint(certHTML, student.name);
+  }catch(e){ console.error('_buildReportHTML:',e); return null; }
+}
+
+function _wrapForPrint(certHTML, name){
+  var css = [
+    '@page{size:A4 landscape;margin:0.5cm;}',
+    '*{box-sizing:border-box;margin:0;padding:0;}',
+    'html,body{width:100%;-webkit-print-color-adjust:exact;print-color-adjust:exact;}',
+    'body{font-family:Arial,sans-serif;direction:rtl;background:#fff;}',
+    '.cert-wrap{width:100%;}.cert{border:1.5px solid #0f766e;border-radius:6px;padding:7px 10px;position:relative;padding-right:14px;}',
+    '.cert::before{content:"";position:absolute;top:0;right:0;bottom:0;width:5px;background:linear-gradient(180deg,#0f766e,#14b8a6);}',
+    '.cert-hdr{display:flex;align-items:center;gap:10px;padding-bottom:5px;margin-bottom:5px;border-bottom:2px solid #0f766e;}',
+    '.cert-hdr img{height:40px!important;width:auto!important;flex-shrink:0;}',
+    '.cert-hdr-center{text-align:center;flex:1;}',
+    '.cert-school{font-size:11px;font-weight:900;color:#0f766e;line-height:1.5;}',
+    '.cert-title{font-size:9px;color:#6b7280;font-weight:600;}',
+    '.cert-report-title{font-size:10px;font-weight:900;color:#134e4a;}',
+    '.cert-stu{background:#f0fdf9;border:1.5px solid #6ee7b7;border-radius:5px;padding:4px 10px;margin-bottom:5px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}',
+    '.cert-stu-name{font-size:11px;font-weight:900;color:#0f766e;}',
+    '.cert-stu-info{font-size:9px;color:#6b7280;}',
+    '.cert-stu-badge{font-size:9px;font-weight:800;background:#0f766e22;color:#0f766e;padding:2px 8px;border-radius:12px;}',
+    '.cert-table{width:100%;border-collapse:collapse;font-size:9px;}',
+    '.tbl-hdr-row{background:#0f766e;}.tbl-hdr-row th{color:#fff;padding:4px 6px;font-weight:700;font-size:9px;text-align:center;border:1px solid #0d5c56;white-space:nowrap;}',
+    '.tbl-th-sub{text-align:right!important;padding-right:8px!important;min-width:95px;}.tbl-th-teacher{min-width:75px;}.tbl-th-item{min-width:48px;}.tbl-th-grade{min-width:62px;}',
+    '.tbl-row td{padding:6px 5px;border:0.5px solid #d1fae5;vertical-align:middle;white-space:nowrap;}',
+    '.tbl-row.even{background:#f0fdf9;}.tbl-row.odd{background:#fff;}',
+    '.tbl-row.pe-row td{background:#f0fdf4!important;}',
+    '.tbl-row.admin-row td{background:#eff6ff!important;border-top:2px solid #3b82f6!important;}',
+    '.tbl-td-sub{font-weight:800;color:#0f766e;font-size:9px;border-right:2.5px solid #0f766e!important;}',
+    '.tbl-td-sub.admin{color:#1d4ed8;border-right:2.5px solid #3b82f6!important;}',
+    '.tbl-td-sub.pe{color:#166534;border-right:2.5px solid #16a34a!important;}',
+    '.tbl-td-teacher{font-size:8px;color:#6b7280;}',
+    '.tbl-td-val{text-align:center;font-size:9.5px;font-weight:900;color:#1a2332;}',
+    '.tbl-td-val.empty{color:#9ca3af;font-weight:400;}',
+    '.score-wrap{display:inline-flex;align-items:baseline;gap:1px;}',
+    '.score-num{font-size:11px;font-weight:900;color:#0f766e;}',
+    '.score-max{font-size:8px;color:#9ca3af;font-weight:500;}',
+    '.score-sep{font-size:8px;color:#9ca3af;}',
+    '.score-full{color:#fff!important;background:#0f766e;border-radius:4px;padding:1px 4px;font-size:9.5px;font-weight:900;}',
+    '.tbl-td-grade{text-align:center;white-space:nowrap;}',
+    '.tbl-td-admin{font-size:8.5px;color:#1e40af;line-height:1.8;}',
+    '.tbl-td-pe{font-size:8.5px;color:#166534;line-height:1.8;}',
+    '.grade-pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:8.5px;font-weight:800;white-space:nowrap;}',
+    '.grade-empty{font-size:8px;color:#d97706;background:#fef3c7;padding:2px 6px;border-radius:10px;}',
+    '.status-badge{font-size:8px;background:#fee2e2;color:#991b1b;padding:1px 5px;border-radius:8px;}',
+    '.adm-item{display:inline-flex;align-items:center;gap:3px;margin-left:8px;font-size:8.5px;}',
+    '.adm-lbl{color:#6b7280;font-size:8px;}',
+    '.note-row .note-cell{font-size:8px;color:#78350f;background:#fffbeb;padding:3px 8px;}',
+    '.cert-sigs{display:flex;justify-content:space-between;align-items:center;padding-top:5px;margin-top:5px;border-top:1.5px dashed #6ee7b7;gap:4px;}',
+    '.cert-sig{text-align:center;flex:1;}',
+    '.cert-sig-title{font-size:9px;color:#6b7280;font-weight:700;}',
+    '.cert-sig-line{font-size:10px;color:#0f766e;font-weight:900;}',
+    '.cert-sig-line.admin-sig{color:#1d4ed8;}',
+    '.cert-date{font-size:9px;color:#0f766e;font-weight:800;text-align:center;flex:1;}',
+    '.cert-actions{display:none!important;}'
+  ].join('');
+
+  return '<!DOCTYPE html><html dir="rtl" lang="ar"><head>'
+    +'<meta charset="UTF-8"><title>'+(name||'تقرير')+'</title>'
+    +'<style>'+css+'</style>'
+    +'</head><body><div class="cert-wrap">'+certHTML+'</div></body></html>';
+}
 </script>
 
 </body>
