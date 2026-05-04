@@ -1906,7 +1906,7 @@ function renderParentReport(student){
   // معلمو الصف
   DB.teachers.forEach(t=>{
     if(!(t.classes||[]).includes(cls)) return;
-    const items = getTeacherItems(t, cls);
+    const items = window._getItemsForClass(t, cls);
     if(!items.length) return;
     const rec   = REC[rKey(false, t.username, cls)] || {};
     const r     = rec[student.id] || {};
@@ -3022,10 +3022,10 @@ function _wrapForPrint(certHTML, name){
 
 <script>
 // =====================================================================
-// تعديل: منطق بنود الرصد حسب الصف
-// - التربية البدنية: physical_items لجميع الصفوف
-// - الصف التاسع + غير تربية بدنية: بند الاختبار التجريبي فقط
-// - باقي الصفوف + غير تربية بدنية: كل teacher_items ما عدا التجريبي
+// تعديل بنود الرصد حسب الصف - نسخة محكمة
+// نعرّف دالة جديدة _getItemsForClass تُستخدم بدل getTeacherItems
+// في الأماكن التي نتحكم فيها (renderParentReport)
+// وكذلك نُراقب getTeacherItems ونُعيد تطبيق override عند أي تغيير
 // =====================================================================
 (function(){
 
@@ -3040,46 +3040,100 @@ function _wrapForPrint(certHTML, name){
     return item.name.indexOf('تجريبي') >= 0;
   }
 
-  function _applyOverride(){
-    var _origGTI = window.getTeacherItems;
-    if(typeof _origGTI !== 'function'){
-      setTimeout(_applyOverride, 300);
+  function _isPE(teacher){
+    var subj = (teacher && teacher.subject) ? teacher.subject.trim() : '';
+    return subj.indexOf('التربية البدنية') >= 0
+        || subj.indexOf('الرياضة') >= 0
+        || subj.indexOf('رياضة') >= 0
+        || subj.indexOf('بدنية') >= 0
+        || subj === 'PE';
+  }
+
+  // الدالة الرئيسية المستخدمة في renderParentReport وجدول الرصد
+  window._getItemsForClass = function(teacher, cls){
+    // تحديد الصف
+    var currentClass = cls
+      || window._currentReportClass
+      || (typeof ST_ !== 'undefined' ? (ST_.tClass || ST_.sClass || '') : '')
+      || '';
+
+    // التربية البدنية: استخدم getTeacherItems الأصلية دائماً
+    if(_isPE(teacher)){
+      return typeof window.getTeacherItems === 'function'
+        ? window.getTeacherItems(teacher)
+        : (typeof DB !== 'undefined' ? (DB.physical_items || []) : []);
+    }
+
+    var allItems = (typeof DB !== 'undefined' && DB.teacher_items) ? DB.teacher_items : [];
+
+    if(_isGrade9(currentClass)){
+      // صف تاسع: الاختبار التجريبي فقط
+      var trial = allItems.filter(_isTrialExam);
+      return trial.length > 0 ? trial : allItems;
+    } else {
+      // باقي الصفوف: كل البنود ما عدا التجريبي
+      var normal = allItems.filter(function(it){ return !_isTrialExam(it); });
+      return normal.length > 0 ? normal : allItems;
+    }
+  };
+
+  // ---- تطبيق override على getTeacherItems أيضاً (لجدول الرصد) ----
+  var _overrideApplied = false;
+  var _origGTI = null;
+
+  function _applyGTIOverride(){
+    var current = window.getTeacherItems;
+
+    // إذا لم تُحمَّل بعد، انتظر
+    if(typeof current !== 'function'){
+      setTimeout(_applyGTIOverride, 200);
       return;
     }
 
-    window.getTeacherItems = function(teacher, explicitClass){
+    // إذا هي نفس override الخاص بنا، لا تفعل شيئاً
+    if(current._isOurOverride) return;
+
+    // حفظ الأصلية
+    _origGTI = current;
+
+    // تطبيق override
+    function _ourOverride(teacher, explicitClass){
       var cls = explicitClass
         || window._currentReportClass
         || (typeof ST_ !== 'undefined' ? (ST_.tClass || ST_.sClass || '') : '')
         || '';
 
-      var subj = (teacher && teacher.subject) ? teacher.subject.trim() : '';
-
-      var isPE = subj.indexOf('التربية البدنية') >= 0
-               || subj.indexOf('الرياضة') >= 0
-               || subj.indexOf('رياضة') >= 0
-               || subj.indexOf('بدنية') >= 0
-               || subj === 'PE';
-      if(isPE) return _origGTI.call(this, teacher);
+      if(_isPE(teacher)) return _origGTI.call(this, teacher);
 
       var allItems = (typeof DB !== 'undefined' && DB.teacher_items) ? DB.teacher_items : [];
 
       if(_isGrade9(cls)){
-        var trialItems = allItems.filter(_isTrialExam);
-        return trialItems.length > 0 ? trialItems : allItems;
+        var trial = allItems.filter(_isTrialExam);
+        return trial.length > 0 ? trial : allItems;
       } else {
-        var normalItems = allItems.filter(function(it){ return !_isTrialExam(it); });
-        return normalItems.length > 0 ? normalItems : allItems;
+        var normal = allItems.filter(function(it){ return !_isTrialExam(it); });
+        return normal.length > 0 ? normal : allItems;
       }
-    };
+    }
+    _ourOverride._isOurOverride = true;
 
+    window.getTeacherItems = _ourOverride;
+    _overrideApplied = true;
   }
 
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', function(){ setTimeout(_applyOverride, 700); });
-  } else {
-    setTimeout(_applyOverride, 700);
+  // مراقبة مستمرة كل 500ms للتأكد من بقاء override
+  function _watchGTI(){
+    var current = window.getTeacherItems;
+    if(typeof current === 'function' && !current._isOurOverride){
+      _applyGTIOverride();
+    }
+    setTimeout(_watchGTI, 500);
   }
+
+  // تشغيل
+  setTimeout(_applyGTIOverride, 300);
+  setTimeout(_watchGTI, 1000);
+
 })();
 </script>
 </body>
