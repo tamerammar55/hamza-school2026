@@ -2308,82 +2308,7 @@ function exportStudentPDF(){
     + '}'
     + '@media print{.cert-actions,.btn,.toast{display:none!important;}}'
     + '</style></head><body>'+ certHTML
-    + '
-<script>
-// =====================================================================
-// تعديل: منطق بنود الرصد حسب الصف (يُطبَّق على جدول الرصد وتقرير ولي الأمر)
-//
-// القواعد:
-// - التربية البدنية: physical_items لجميع الصفوف (لا تغيير)
-// - صف التاسع + غير تربية بدنية: بند "الاختبار التجريبي" فقط
-// - باقي الصفوف + غير تربية بدنية: كل teacher_items ما عدا "الاختبار التجريبي"
-// =====================================================================
-(function(){
-
-  // هل الصف من صفوف التاسع؟
-  function _isGrade9(cls){
-    if(!cls) return false;
-    var c = String(cls).trim();
-    return c.charAt(0) === '9' || c.indexOf('تاسع') >= 0;
-  }
-
-  // هل البند اختبار تجريبي؟
-  function _isTrialExam(item){
-    if(!item || !item.name) return false;
-    return item.name.indexOf('تجريبي') >= 0;
-  }
-
-  function _applyOverride(){
-    var _origGTI = window.getTeacherItems;
-    if(typeof _origGTI !== 'function'){
-      setTimeout(_applyOverride, 300);
-      return;
-    }
-
-    // تجاوز getTeacherItems مع دعم تمرير الصف صراحةً
-    window.getTeacherItems = function(teacher, explicitClass){
-      // تحديد الصف بأفضل مصدر متاح
-      var cls = explicitClass
-        || window._currentReportClass
-        || (typeof ST_ !== 'undefined' ? (ST_.tClass || ST_.sClass || '') : '')
-        || '';
-
-      var subj = (teacher && teacher.subject) ? teacher.subject.trim() : '';
-
-      // التربية البدنية → الدالة الأصلية دائماً (physical_items)
-      var isPE = subj.indexOf('التربية البدنية') >= 0
-               || subj.indexOf('الرياضة') >= 0
-               || subj.indexOf('رياضة') >= 0
-               || subj.indexOf('بدنية') >= 0
-               || subj === 'PE';
-      if(isPE) return _origGTI.call(this, teacher);
-
-      // جلب teacher_items
-      var allItems = (typeof DB !== 'undefined' && DB.teacher_items) ? DB.teacher_items : [];
-
-      if(_isGrade9(cls)){
-        // صف تاسع: بند الاختبار التجريبي فقط
-        var trialItems = allItems.filter(_isTrialExam);
-        return trialItems.length > 0 ? trialItems : allItems;
-      } else {
-        // باقي الصفوف: كل البنود ما عدا الاختبار التجريبي
-        var normalItems = allItems.filter(function(it){ return !_isTrialExam(it); });
-        return normalItems.length > 0 ? normalItems : allItems;
-      }
-    };
-
-    console.log('✅ grade-9 items filter active');
-  }
-
-  // تشغيل بعد تحميل الكود الأصلي
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', function(){ setTimeout(_applyOverride, 700); });
-  } else {
-    setTimeout(_applyOverride, 700);
-  }
-})();
-</script>
-</body></html>';
+    + '</body></html>';
 
   // إنشاء iframe مخفي وطباعة منه
   let iframe = document.getElementById("_printFrame");
@@ -3094,5 +3019,68 @@ function _wrapForPrint(certHTML, name){
 }
 </script>
 
+
+<script>
+// =====================================================================
+// تعديل: منطق بنود الرصد حسب الصف
+// - التربية البدنية: physical_items لجميع الصفوف
+// - الصف التاسع + غير تربية بدنية: بند الاختبار التجريبي فقط
+// - باقي الصفوف + غير تربية بدنية: كل teacher_items ما عدا التجريبي
+// =====================================================================
+(function(){
+
+  function _isGrade9(cls){
+    if(!cls) return false;
+    var c = String(cls).trim();
+    return c.charAt(0) === '9' || c.indexOf('تاسع') >= 0;
+  }
+
+  function _isTrialExam(item){
+    if(!item || !item.name) return false;
+    return item.name.indexOf('تجريبي') >= 0;
+  }
+
+  function _applyOverride(){
+    var _origGTI = window.getTeacherItems;
+    if(typeof _origGTI !== 'function'){
+      setTimeout(_applyOverride, 300);
+      return;
+    }
+
+    window.getTeacherItems = function(teacher, explicitClass){
+      var cls = explicitClass
+        || window._currentReportClass
+        || (typeof ST_ !== 'undefined' ? (ST_.tClass || ST_.sClass || '') : '')
+        || '';
+
+      var subj = (teacher && teacher.subject) ? teacher.subject.trim() : '';
+
+      var isPE = subj.indexOf('التربية البدنية') >= 0
+               || subj.indexOf('الرياضة') >= 0
+               || subj.indexOf('رياضة') >= 0
+               || subj.indexOf('بدنية') >= 0
+               || subj === 'PE';
+      if(isPE) return _origGTI.call(this, teacher);
+
+      var allItems = (typeof DB !== 'undefined' && DB.teacher_items) ? DB.teacher_items : [];
+
+      if(_isGrade9(cls)){
+        var trialItems = allItems.filter(_isTrialExam);
+        return trialItems.length > 0 ? trialItems : allItems;
+      } else {
+        var normalItems = allItems.filter(function(it){ return !_isTrialExam(it); });
+        return normalItems.length > 0 ? normalItems : allItems;
+      }
+    };
+
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', function(){ setTimeout(_applyOverride, 700); });
+  } else {
+    setTimeout(_applyOverride, 700);
+  }
+})();
+</script>
 </body>
 </html>
