@@ -3022,15 +3022,14 @@ function _wrapForPrint(certHTML, name){
 
 <script>
 // =====================================================================
-// تعديل بنود الرصد حسب الصف
-// البنود من الإعدادات:
-//   الواجب الورقية | الواجبات الالكترونية | التقييمات
-//   التعليم عن بعد | نظام قطر للتعليم | السلوك | الاختبار التجريبي
+// استراتيجية جديدة: تعديل DB.teacher_items مباشرة حسب الصف
+// renderTable تقرأ DB.teacher_items مباشرة عبر getTeacherItems
+// لذا نعدّل المصدر نفسه عند كل تغيير صف
 //
 // القواعد:
-// - التربية البدنية: physical_items لجميع الصفوف
-// - صف 9: "الاختبار التجريبي" + "السلوك" فقط
-// - باقي الصفوف: كل البنود ما عدا "الاختبار التجريبي"
+// - التربية البدنية: physical_items دائماً (لا تغيير - getTeacherItems تتعامل معها)
+// - صف 9: الاختبار التجريبي + السلوك فقط
+// - باقي الصفوف: كل البنود ما عدا الاختبار التجريبي
 // =====================================================================
 (function(){
 
@@ -3039,138 +3038,127 @@ function _wrapForPrint(certHTML, name){
     var c = String(cls).trim();
     return c.charAt(0) === '9' || c.indexOf('تاسع') >= 0;
   }
-
-  // البند: الاختبار التجريبي
   function _isTrialExam(item){
     if(!item || !item.name) return false;
-    var n = item.name.trim();
-    return n === 'الاختبار التجريبي'
-        || n.indexOf('التجريبي') >= 0;
+    return item.name.indexOf('تجريبي') >= 0;
   }
-
-  // البند: السلوك
   function _isBehavior(item){
     if(!item || !item.name) return false;
-    var n = item.name.trim();
-    return n === 'السلوك'
-        || n.indexOf('سلوك') >= 0;
+    return item.name.indexOf('سلوك') >= 0;
   }
-
   function _isPE(teacher){
-    var subj = (teacher && teacher.subject) ? teacher.subject.trim() : '';
-    return subj.indexOf('التربية البدنية') >= 0
-        || subj.indexOf('الرياضة') >= 0
-        || subj.indexOf('رياضة') >= 0
-        || subj.indexOf('بدنية') >= 0
-        || subj === 'PE';
+    var s = (teacher && teacher.subject) ? teacher.subject.trim() : '';
+    return s.indexOf('بدنية') >= 0
+        || s.indexOf('رياضة') >= 0
+        || s === 'PE';
   }
 
-  // الدالة المركزية لاختيار البنود
-  function _filterItems(allItems, cls){
+  // حفظ النسخة الكاملة وتطبيق الفلتر على DB.teacher_items
+  function _applyFilter(cls){
+    if(typeof DB === 'undefined') return;
+
+    // حفظ النسخة الأصلية مرة واحدة فقط
+    if(!DB._all_teacher_items && DB.teacher_items && DB.teacher_items.length){
+      DB._all_teacher_items = DB.teacher_items.slice();
+    }
+    var all = DB._all_teacher_items || DB.teacher_items || [];
+    if(!all.length) return;
+
+    var filtered;
     if(_isGrade9(cls)){
       // صف 9: الاختبار التجريبي + السلوك فقط
-      var g9 = allItems.filter(function(it){
-        return _isTrialExam(it) || _isBehavior(it);
-      });
-      return g9.length > 0 ? g9 : allItems;
+      filtered = all.filter(function(it){ return _isTrialExam(it) || _isBehavior(it); });
     } else {
       // باقي الصفوف: كل البنود ما عدا الاختبار التجريبي
-      var other = allItems.filter(function(it){ return !_isTrialExam(it); });
-      return other.length > 0 ? other : allItems;
+      filtered = all.filter(function(it){ return !_isTrialExam(it); });
     }
+
+    if(!filtered.length) filtered = all; // fallback
+
+    DB.teacher_items = filtered;
   }
 
-  // دالة تقرير ولي الأمر
+  // دالة _getItemsForClass لـ renderParentReport
   window._getItemsForClass = function(teacher, cls){
     var currentClass = cls || window._currentReportClass || '';
     if(_isPE(teacher)){
       return (typeof DB !== 'undefined' && DB.physical_items && DB.physical_items.length)
         ? DB.physical_items : [];
     }
-    var allItems = (typeof DB !== 'undefined' && DB.teacher_items) ? DB.teacher_items : [];
-    return _filterItems(allItems, currentClass);
+    var all = (typeof DB !== 'undefined')
+      ? (DB._all_teacher_items || DB.teacher_items || [])
+      : [];
+    if(!all.length) return [];
+
+    if(_isGrade9(currentClass)){
+      var r = all.filter(function(it){ return _isTrialExam(it) || _isBehavior(it); });
+      return r.length ? r : all;
+    } else {
+      var r2 = all.filter(function(it){ return !_isTrialExam(it); });
+      return r2.length ? r2 : all;
+    }
   };
 
-  // override على getTeacherItems
-  function _applyGTIOverride(){
-    var current = window.getTeacherItems;
-    if(typeof current !== 'function'){ setTimeout(_applyGTIOverride, 200); return; }
-    if(current._isOurOverride) return;
-    var _orig = current;
-    function _ourOverride(teacher, explicitClass){
-      var cls = explicitClass
-        || window._currentReportClass
-        || (typeof ST_ !== 'undefined' ? (ST_.tClass || ST_.sClass || '') : '')
-        || '';
-      if(_isPE(teacher)) return _orig.call(this, teacher);
-      var allItems = (typeof DB !== 'undefined' && DB.teacher_items) ? DB.teacher_items : [];
-      return _filterItems(allItems, cls);
-    }
-    _ourOverride._isOurOverride = true;
-    window.getTeacherItems = _ourOverride;
-  }
-
-  // فحص هل الجدول يحتاج إعادة بناء
-  function _needsRebuild(){
-    var cls = typeof ST_ !== 'undefined' ? (ST_.tClass || '') : '';
-    if(!cls) return false;
-    var thEl = document.getElementById('tTH');
-    if(!thEl) return false;
-    var headers = [];
-    thEl.querySelectorAll('th').forEach(function(th){ headers.push(th.textContent.trim()); });
-
-    if(_isGrade9(cls)){
-      // في التاسع: يجب ألا تظهر بنود غير التجريبي/السلوك
-      return headers.some(function(h){
-        return h.indexOf('واجب') >= 0
-            || h.indexOf('تقييمات') >= 0
-            || h.indexOf('تعليم') >= 0
-            || h.indexOf('نظام') >= 0;
-      });
-    } else {
-      // في غير التاسع: يجب ألا يظهر التجريبي
-      return headers.some(function(h){
-        return h.indexOf('التجريبي') >= 0;
-      });
-    }
-  }
-
-  function _rebuildTable(){
-    if(window._rebuildInProgress) return;
-    if(!_needsRebuild()) return;
-    window._rebuildInProgress = true;
-    if(typeof window.renderTable === 'function') window.renderTable(false);
-    setTimeout(function(){ window._rebuildInProgress = false; }, 300);
-  }
-
-  // اعتراض selCls
+  // اعتراض selCls لتغيير DB.teacher_items قبل استدعاء renderTable
   function _interceptSelCls(){
-    var origSC = window.selCls;
-    if(typeof origSC !== 'function' || origSC._isOurSC){
-      if(typeof origSC !== 'function') setTimeout(_interceptSelCls, 300);
+    var orig = window.selCls;
+    if(typeof orig !== 'function' || orig._ours){
+      if(typeof orig !== 'function') setTimeout(_interceptSelCls, 200);
       return;
     }
-    function _ourSelCls(cls, isStaff){
-      origSC.call(this, cls, isStaff);
-      if(!isStaff) setTimeout(_rebuildTable, 250);
+    function _ours(cls, isStaff){
+      if(!isStaff){
+        // تطبيق الفلتر قبل renderTable
+        _applyFilter(cls);
+      }
+      orig.call(this, cls, isStaff);
     }
-    _ourSelCls._isOurSC = true;
-    window.selCls = _ourSelCls;
+    _ours._ours = true;
+    window.selCls = _ours;
   }
 
-  // مراقب مستمر
+  // اعتراض TL (تسجيل دخول المعلم) لتطبيق الفلتر عند أول تحميل
+  function _interceptTL(){
+    var origTL = window.TL;
+    if(typeof origTL !== 'function' || origTL._ours){
+      if(typeof origTL !== 'function') setTimeout(_interceptTL, 200);
+      return;
+    }
+    function _oursTL(){
+      origTL.apply(this, arguments);
+      // بعد الدخول، ST_.tClass يكون قد تحدد
+      setTimeout(function(){
+        if(typeof ST_ !== 'undefined' && ST_.tClass){
+          _applyFilter(ST_.tClass);
+        }
+      }, 100);
+    }
+    _oursTL._ours = true;
+    window.TL = _oursTL;
+  }
+
+  // مراقب: إعادة تطبيق الفلتر إذا تغير DB.teacher_items للنسخة الأصلية
   function _watch(){
-    var gti = window.getTeacherItems;
-    if(typeof gti === 'function' && !gti._isOurOverride) _applyGTIOverride();
-    var sc = window.selCls;
-    if(typeof sc === 'function' && !sc._isOurSC) _interceptSelCls();
-    _rebuildTable();
-    setTimeout(_watch, 800);
+    if(typeof DB !== 'undefined' && typeof ST_ !== 'undefined'){
+      var cls = ST_.tClass || '';
+      if(cls && DB.teacher_items && DB._all_teacher_items){
+        // هل DB.teacher_items هي النسخة الكاملة؟ (يعني الفلتر أُزيل)
+        if(DB.teacher_items.length === DB._all_teacher_items.length){
+          // تحقق هل يجب فلترة
+          var needsFilter = _isGrade9(cls)
+            ? DB.teacher_items.some(function(it){ return !_isTrialExam(it) && !_isBehavior(it); })
+            : DB.teacher_items.some(_isTrialExam);
+          if(needsFilter) _applyFilter(cls);
+        }
+      }
+    }
+    setTimeout(_watch, 600);
   }
 
-  setTimeout(_applyGTIOverride, 300);
-  setTimeout(_interceptSelCls, 500);
-  setTimeout(_watch, 1200);
+  // تشغيل
+  setTimeout(_interceptSelCls, 200);
+  setTimeout(_interceptTL, 200);
+  setTimeout(_watch, 800);
 
 })();
 </script>
