@@ -3022,23 +3022,38 @@ function _wrapForPrint(certHTML, name){
 
 <script>
 // =====================================================================
-// تعديل بنود الرصد حسب الصف - الحل الجذري
-// المشكلة: renderTable في الكود المشفر تجلب البنود مباشرة من DB
-//           لذا override على getTeacherItems وحده لا يكفي
-// الحل: نعترض renderTable ونعيد بناء الجدول بعدها مباشرة بالبنود الصحيحة
+// تعديل بنود الرصد حسب الصف
+// البنود من الإعدادات:
+//   الواجب الورقية | الواجبات الالكترونية | التقييمات
+//   التعليم عن بعد | نظام قطر للتعليم | السلوك | الاختبار التجريبي
+//
+// القواعد:
+// - التربية البدنية: physical_items لجميع الصفوف
+// - صف 9: "الاختبار التجريبي" + "السلوك" فقط
+// - باقي الصفوف: كل البنود ما عدا "الاختبار التجريبي"
 // =====================================================================
 (function(){
 
-  // ===== دوال المساعدة =====
   function _isGrade9(cls){
     if(!cls) return false;
     var c = String(cls).trim();
     return c.charAt(0) === '9' || c.indexOf('تاسع') >= 0;
   }
 
+  // البند: الاختبار التجريبي
   function _isTrialExam(item){
     if(!item || !item.name) return false;
-    return item.name.indexOf('تجريبي') >= 0;
+    var n = item.name.trim();
+    return n === 'الاختبار التجريبي'
+        || n.indexOf('التجريبي') >= 0;
+  }
+
+  // البند: السلوك
+  function _isBehavior(item){
+    if(!item || !item.name) return false;
+    var n = item.name.trim();
+    return n === 'السلوك'
+        || n.indexOf('سلوك') >= 0;
   }
 
   function _isPE(teacher){
@@ -3050,7 +3065,22 @@ function _wrapForPrint(certHTML, name){
         || subj === 'PE';
   }
 
-  // الدالة المستخدمة في renderParentReport
+  // الدالة المركزية لاختيار البنود
+  function _filterItems(allItems, cls){
+    if(_isGrade9(cls)){
+      // صف 9: الاختبار التجريبي + السلوك فقط
+      var g9 = allItems.filter(function(it){
+        return _isTrialExam(it) || _isBehavior(it);
+      });
+      return g9.length > 0 ? g9 : allItems;
+    } else {
+      // باقي الصفوف: كل البنود ما عدا الاختبار التجريبي
+      var other = allItems.filter(function(it){ return !_isTrialExam(it); });
+      return other.length > 0 ? other : allItems;
+    }
+  }
+
+  // دالة تقرير ولي الأمر
   window._getItemsForClass = function(teacher, cls){
     var currentClass = cls || window._currentReportClass || '';
     if(_isPE(teacher)){
@@ -3058,174 +3088,86 @@ function _wrapForPrint(certHTML, name){
         ? DB.physical_items : [];
     }
     var allItems = (typeof DB !== 'undefined' && DB.teacher_items) ? DB.teacher_items : [];
-    if(_isGrade9(currentClass)){
-      var trial = allItems.filter(_isTrialExam);
-      return trial.length > 0 ? trial : allItems;
-    } else {
-      var normal = allItems.filter(function(it){ return !_isTrialExam(it); });
-      return normal.length > 0 ? normal : allItems;
-    }
+    return _filterItems(allItems, currentClass);
   };
 
-  // ===== الحل الجذري: اعتراض renderTable =====
-  function _getCorrectItems(isStaff){
-    if(isStaff) return typeof DB !== 'undefined' ? (DB.admin_items || []) : [];
-
-    var teacher = typeof ST_ !== 'undefined' ? ST_.teacher : null;
-    if(!teacher) return typeof DB !== 'undefined' ? (DB.teacher_items || []) : [];
-
-    var cls = typeof ST_ !== 'undefined' ? (ST_.tClass || '') : '';
-
-    if(_isPE(teacher)){
-      return typeof DB !== 'undefined' ? (DB.physical_items || []) : [];
-    }
-
-    var allItems = typeof DB !== 'undefined' ? (DB.teacher_items || []) : [];
-
-    if(_isGrade9(cls)){
-      var trial = allItems.filter(_isTrialExam);
-      return trial.length > 0 ? trial : allItems;
-    } else {
-      var normal = allItems.filter(function(it){ return !_isTrialExam(it); });
-      return normal.length > 0 ? normal : allItems;
-    }
-  }
-
-  // إعادة بناء رأس الجدول وجسمه بالبنود الصحيحة
-  function _rebuildTable(isStaff){
-    var cls = typeof ST_ !== 'undefined' ? (isStaff ? ST_.sClass : ST_.tClass) : '';
-    if(!cls) return;
-
-    var items = _getCorrectItems(isStaff);
-    if(!items.length) return;
-
-    var thId = isStaff ? 'sTH' : 'tTH';
-    var tbId = isStaff ? 'sTB' : 'tTB';
-    var thEl = document.getElementById(thId);
-    var tbEl = document.getElementById(tbId);
-    if(!thEl || !tbEl) return;
-
-    // فحص: هل رأس الجدول الحالي يختلف عن البنود الصحيحة؟
-    var currentHeaders = [];
-    var ths = thEl.querySelectorAll('th');
-    ths.forEach(function(th){ currentHeaders.push(th.textContent.trim()); });
-
-    var correctHeaders = items.map(function(it){ return it.name; });
-
-    // مقارنة: هل يحتاج إعادة بناء؟
-    var needsRebuild = false;
-    if(currentHeaders.length !== correctHeaders.length + 4){ // +4 للرقم والاسم والحالة والملاحظات
-      needsRebuild = true;
-    } else {
-      // تحقق من وجود بنود خاطئة
-      if(_isGrade9(cls)){
-        // يجب أن تظهر التجريبي فقط
-        var hasNonTrial = currentHeaders.some(function(h){
-          return h.indexOf('واجب') >= 0
-              || h.indexOf('مشاركة') >= 0
-              || h.indexOf('تقييمات') >= 0;
-        });
-        if(hasNonTrial) needsRebuild = true;
-      } else {
-        // يجب ألا تظهر التجريبي
-        var hasTrial = currentHeaders.some(function(h){
-          return h.indexOf('تجريبي') >= 0;
-        });
-        if(hasTrial) needsRebuild = true;
-      }
-    }
-
-    if(!needsRebuild) return;
-
-    // إعادة استدعاء renderTable بالطريقة الصحيحة
-    if(typeof window.renderTable === 'function'){
-      // نمنع اللانهاية بحراسة
-      if(window._rebuildInProgress) return;
-      window._rebuildInProgress = true;
-      window.renderTable(isStaff);
-      setTimeout(function(){ window._rebuildInProgress = false; }, 100);
-    }
-  }
-
-  // ===== اعتراض getTeacherItems =====
-  var _origGTI = null;
-  var _overrideApplied = false;
-
+  // override على getTeacherItems
   function _applyGTIOverride(){
     var current = window.getTeacherItems;
-    if(typeof current !== 'function'){
-      setTimeout(_applyGTIOverride, 200);
-      return;
-    }
+    if(typeof current !== 'function'){ setTimeout(_applyGTIOverride, 200); return; }
     if(current._isOurOverride) return;
-
-    _origGTI = current;
-
+    var _orig = current;
     function _ourOverride(teacher, explicitClass){
       var cls = explicitClass
         || window._currentReportClass
         || (typeof ST_ !== 'undefined' ? (ST_.tClass || ST_.sClass || '') : '')
         || '';
-
-      if(_isPE(teacher)) return _origGTI.call(this, teacher);
-
+      if(_isPE(teacher)) return _orig.call(this, teacher);
       var allItems = (typeof DB !== 'undefined' && DB.teacher_items) ? DB.teacher_items : [];
-
-      if(_isGrade9(cls)){
-        var trial = allItems.filter(_isTrialExam);
-        return trial.length > 0 ? trial : allItems;
-      } else {
-        var normal = allItems.filter(function(it){ return !_isTrialExam(it); });
-        return normal.length > 0 ? normal : allItems;
-      }
+      return _filterItems(allItems, cls);
     }
     _ourOverride._isOurOverride = true;
     window.getTeacherItems = _ourOverride;
-    _overrideApplied = true;
   }
 
-  // ===== اعتراض selCls (تُستدعى عند اختيار صف) =====
+  // فحص هل الجدول يحتاج إعادة بناء
+  function _needsRebuild(){
+    var cls = typeof ST_ !== 'undefined' ? (ST_.tClass || '') : '';
+    if(!cls) return false;
+    var thEl = document.getElementById('tTH');
+    if(!thEl) return false;
+    var headers = [];
+    thEl.querySelectorAll('th').forEach(function(th){ headers.push(th.textContent.trim()); });
+
+    if(_isGrade9(cls)){
+      // في التاسع: يجب ألا تظهر بنود غير التجريبي/السلوك
+      return headers.some(function(h){
+        return h.indexOf('واجب') >= 0
+            || h.indexOf('تقييمات') >= 0
+            || h.indexOf('تعليم') >= 0
+            || h.indexOf('نظام') >= 0;
+      });
+    } else {
+      // في غير التاسع: يجب ألا يظهر التجريبي
+      return headers.some(function(h){
+        return h.indexOf('التجريبي') >= 0;
+      });
+    }
+  }
+
+  function _rebuildTable(){
+    if(window._rebuildInProgress) return;
+    if(!_needsRebuild()) return;
+    window._rebuildInProgress = true;
+    if(typeof window.renderTable === 'function') window.renderTable(false);
+    setTimeout(function(){ window._rebuildInProgress = false; }, 300);
+  }
+
+  // اعتراض selCls
   function _interceptSelCls(){
     var origSC = window.selCls;
     if(typeof origSC !== 'function' || origSC._isOurSC){
-      setTimeout(_interceptSelCls, 300);
+      if(typeof origSC !== 'function') setTimeout(_interceptSelCls, 300);
       return;
     }
     function _ourSelCls(cls, isStaff){
       origSC.call(this, cls, isStaff);
-      // بعد تغيير الصف، نعيد بناء الجدول بالبنود الصحيحة
-      setTimeout(function(){
-        _rebuildTable(isStaff || false);
-      }, 150);
+      if(!isStaff) setTimeout(_rebuildTable, 250);
     }
     _ourSelCls._isOurSC = true;
     window.selCls = _ourSelCls;
   }
 
-  // ===== مراقب مستمر =====
+  // مراقب مستمر
   function _watch(){
-    // إعادة override إذا أُزيل
-    var current = window.getTeacherItems;
-    if(typeof current === 'function' && !current._isOurOverride){
-      _applyGTIOverride();
-    }
-
-    // إعادة selCls إذا أُزيلت
+    var gti = window.getTeacherItems;
+    if(typeof gti === 'function' && !gti._isOurOverride) _applyGTIOverride();
     var sc = window.selCls;
-    if(typeof sc === 'function' && !sc._isOurSC){
-      _interceptSelCls();
-    }
-
-    // إعادة بناء الجدول إذا لزم (للصف المحدد حالياً)
-    if(typeof ST_ !== 'undefined'){
-      if(ST_.tClass && !window._rebuildInProgress) _rebuildTable(false);
-      if(ST_.sClass && !window._rebuildInProgress) _rebuildTable(true);
-    }
-
+    if(typeof sc === 'function' && !sc._isOurSC) _interceptSelCls();
+    _rebuildTable();
     setTimeout(_watch, 800);
   }
 
-  // تشغيل
   setTimeout(_applyGTIOverride, 300);
   setTimeout(_interceptSelCls, 500);
   setTimeout(_watch, 1200);
