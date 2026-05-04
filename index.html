@@ -2068,7 +2068,6 @@ window._clearAllRecDocs = async function(){
     var _batch = [];
     _snap.forEach(function(doc){
       var id = doc.id;
-      // حذف كل أنواع rec_* بدون استثناء
       if(id.indexOf('rec_')===0){
         _batch.push(doc.ref.delete());
       }
@@ -2458,7 +2457,7 @@ async function _loadInitialData(){
   // استرجاع حالة المسح من localStorage
   try{
     var _ct = localStorage.getItem('r3_cleared_at');
-    if(_ct && (Date.now() - parseInt(_ct)) < 604800000){ // 7 أيام
+    if(_ct && (Date.now() - parseInt(_ct)) < 604800000){
       window._wasCleared = true;
       console.log('⚠️ Recent clear detected - blocking old data');
     }
@@ -2485,11 +2484,7 @@ async function _loadInitialData(){
         return;
       }
       if(_id==="records"){ var _d=_r.data; if(_d&&typeof _d==="object") Object.assign(_base,_d); return; }
-      if(_id.indexOf("rec_")===0 && _r.rkey && _r.data!==undefined){
-        // لا تُحمّل rec_* بـ rkey إذا تم المسح مؤخراً
-        if(!window._wasCleared) _base[_r.rkey]=_r.data;
-        return;
-      }
+      if(_id.indexOf("rec_")===0 && _r.rkey && _r.data!==undefined){ if(!window._wasCleared) _base[_r.rkey]=_r.data; return; }
       var _v=_r.data!==undefined?_r.data:_r; if(!_v) return;
       if(_id==="students") DB.students=_v;
       else if(_id==="teachers") DB.teachers=_v;
@@ -3026,80 +3021,156 @@ function _wrapForPrint(certHTML, name){
 
 
 <script>
-// ===== بنود الصفوف حسب المرحلة =====
+// =====================================================================
+// بنود الرصد حسب الصف - الحل النهائي
+// DB محمي ولا يقبل خصائص جديدة → نستخدم window._allTeacherItems
+// =====================================================================
 (function(){
+
   function _isGrade9(cls){
     if(!cls) return false;
     var c = String(cls).trim();
     return c.charAt(0) === '9' || c.indexOf('تاسع') >= 0;
   }
-  function _isTrialExam(it){ return it && it.name && it.name.indexOf('تجريبي') >= 0; }
-  function _isBehavior(it){ return it && it.name && it.name.indexOf('سلوك') >= 0; }
-  function _isPE(t){
-    var s = (t && t.subject) ? t.subject.trim() : '';
-    return s.indexOf('بدنية') >= 0 || s.indexOf('رياضة') >= 0 || s === 'PE';
+  function _isTrialExam(it){
+    return !!(it && it.name && it.name.indexOf('تجريبي') >= 0);
+  }
+  function _isBehavior(it){
+    return !!(it && it.name && it.name.indexOf('سلوك') >= 0);
+  }
+  function _isPE(teacher){
+    var s = (teacher && teacher.subject) ? teacher.subject.trim() : '';
+    return s.indexOf('بدنية') >= 0
+        || s.indexOf('رياضة') >= 0
+        || s === 'PE';
   }
 
+  // حفظ النسخة الكاملة في window (ليس DB لأنه محمي)
+  function _saveAllItems(){
+    if(!window._allTeacherItems || !window._allTeacherItems.length){
+      var items = (typeof DB !== 'undefined' && DB.teacher_items) ? DB.teacher_items : [];
+      if(items.length){
+        window._allTeacherItems = items.slice();
+        console.log('[Grade9] Saved', items.length, 'items to _allTeacherItems');
+      }
+    }
+  }
+
+  // تطبيق الفلتر على DB.teacher_items
   function _applyFilter(cls){
     if(typeof DB === 'undefined') return;
-    if(!DB._all_teacher_items && DB.teacher_items && DB.teacher_items.length)
-      DB._all_teacher_items = DB.teacher_items.slice();
-    var all = DB._all_teacher_items || DB.teacher_items || [];
+    _saveAllItems();
+    var all = window._allTeacherItems || [];
     if(!all.length) return;
-    var f;
-    if(_isGrade9(cls))
-      f = all.filter(function(it){ return _isTrialExam(it) || _isBehavior(it); });
-    else
-      f = all.filter(function(it){ return !_isTrialExam(it); });
-    DB.teacher_items = f.length ? f : all;
+
+    var filtered;
+    if(_isGrade9(cls)){
+      filtered = all.filter(function(it){ return _isTrialExam(it) || _isBehavior(it); });
+      console.log('[Grade9] Grade9 filter:', filtered.map(function(i){ return i.name; }));
+    } else {
+      filtered = all.filter(function(it){ return !_isTrialExam(it); });
+      console.log('[Grade9] Normal filter:', filtered.map(function(i){ return i.name; }));
+    }
+    if(!filtered.length) filtered = all;
+
+    // تعديل DB.teacher_items مباشرة (الخاصية موجودة فيُسمح بتعديلها)
+    DB.teacher_items = filtered;
   }
 
+  // دالة تقرير ولي الأمر
   window._getItemsForClass = function(teacher, cls){
     var c = cls || window._currentReportClass || '';
-    if(_isPE(teacher))
-      return (typeof DB !== 'undefined' && DB.physical_items && DB.physical_items.length) ? DB.physical_items : [];
-    var all = (typeof DB !== 'undefined') ? (DB._all_teacher_items || DB.teacher_items || []) : [];
+    if(_isPE(teacher)){
+      return (typeof DB !== 'undefined' && DB.physical_items && DB.physical_items.length)
+        ? DB.physical_items : [];
+    }
+    _saveAllItems();
+    var all = window._allTeacherItems || (typeof DB !== 'undefined' ? DB.teacher_items : []) || [];
     if(!all.length) return [];
     if(_isGrade9(c)){
-      var r = all.filter(function(it){ return _isTrialExam(it)||_isBehavior(it); });
+      var r = all.filter(function(it){ return _isTrialExam(it) || _isBehavior(it); });
       return r.length ? r : all;
     }
     var r2 = all.filter(function(it){ return !_isTrialExam(it); });
     return r2.length ? r2 : all;
   };
 
-  function _interceptSelCls(){
+  // اعتراض selCls - يُستدعى عند كل تغيير صف
+  function _hookSelCls(){
     var orig = window.selCls;
-    if(typeof orig !== 'function' || orig._ours){ if(typeof orig !== 'function') setTimeout(_interceptSelCls, 200); return; }
-    function _ours(cls, isStaff){ if(!isStaff) _applyFilter(cls); orig.call(this, cls, isStaff); }
-    _ours._ours = true;
-    window.selCls = _ours;
+    if(typeof orig !== 'function' || orig._g9hooked){
+      setTimeout(_hookSelCls, 100);
+      return;
+    }
+    window.selCls = function(cls, isStaff){
+      if(!isStaff){
+        _saveAllItems();
+        _applyFilter(cls);
+      }
+      return orig.apply(this, arguments);
+    };
+    window.selCls._g9hooked = true;
+    console.log('[Grade9] selCls hooked');
   }
 
-  function _interceptTL(){
-    var origTL = window.TL;
-    if(typeof origTL !== 'function' || origTL._ours){ if(typeof origTL !== 'function') setTimeout(_interceptTL, 200); return; }
-    function _oursTL(){ origTL.apply(this, arguments); setTimeout(function(){ if(typeof ST_ !== 'undefined' && ST_.tClass) _applyFilter(ST_.tClass); }, 100); }
-    _oursTL._ours = true;
-    window.TL = _oursTL;
+  // اعتراض TL - عند تسجيل دخول المعلم
+  function _hookTL(){
+    var orig = window.TL;
+    if(typeof orig !== 'function' || orig._g9hooked){
+      setTimeout(_hookTL, 100);
+      return;
+    }
+    window.TL = function(){
+      var r = orig.apply(this, arguments);
+      setTimeout(function(){
+        _saveAllItems();
+        if(typeof ST_ !== 'undefined' && ST_.tClass) _applyFilter(ST_.tClass);
+      }, 200);
+      return r;
+    };
+    window.TL._g9hooked = true;
+    console.log('[Grade9] TL hooked');
   }
 
+  // مراقب دائم - يتحقق كل 500ms
+  var _lastCls = '';
   function _watch(){
     if(typeof DB !== 'undefined' && typeof ST_ !== 'undefined'){
       var cls = ST_.tClass || '';
-      if(cls && DB.teacher_items && DB._all_teacher_items && DB.teacher_items.length === DB._all_teacher_items.length){
-        var needs = _isGrade9(cls)
-          ? DB.teacher_items.some(function(it){ return !_isTrialExam(it)&&!_isBehavior(it); })
-          : DB.teacher_items.some(_isTrialExam);
-        if(needs) _applyFilter(cls);
+
+      // حفظ البنود الأصلية إذا لم تُحفظ بعد
+      _saveAllItems();
+
+      // إذا تغير الصف أو رُمّمت teacher_items للنسخة الكاملة
+      if(cls){
+        var needsFilter = false;
+        if(cls !== _lastCls){
+          needsFilter = true;
+          _lastCls = cls;
+        } else if(window._allTeacherItems && DB.teacher_items){
+          // هل teacher_items أُعيدت للنسخة الكاملة؟
+          if(_isGrade9(cls) && DB.teacher_items.length > window._allTeacherItems.filter(function(i){ return _isTrialExam(i)||_isBehavior(i); }).length){
+            needsFilter = true;
+          } else if(!_isGrade9(cls) && DB.teacher_items.some(_isTrialExam)){
+            needsFilter = true;
+          }
+        }
+        if(needsFilter) _applyFilter(cls);
       }
     }
-    setTimeout(_watch, 600);
+    setTimeout(_watch, 500);
   }
 
-  setTimeout(_interceptSelCls, 200);
-  setTimeout(_interceptTL, 200);
-  setTimeout(_watch, 800);
+  // بدء التشغيل
+  setTimeout(_hookSelCls, 100);
+  setTimeout(_hookTL, 100);
+  setTimeout(_watch, 500);
+
+  // عند تحميل البيانات من Firebase
+  window.addEventListener('firebaseReady', function(){
+    setTimeout(_saveAllItems, 2000);
+  });
+
 })();
 </script>
 </body>
