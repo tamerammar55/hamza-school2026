@@ -717,17 +717,12 @@ const a0_0x3d950d=a0_0x41e7;(function(_0x3de1cb,_0x3b0a80){const _0x302699=a0_0x
            || _subj.indexOf('بدنية') >= 0
            || _subj === 'PE';
   if(_isPE && DB.physical_items && DB.physical_items.length) return DB.physical_items;
-
   var _cls = (_g9cls
     || window._currentReportClass
     || (typeof ST_ !== 'undefined' ? (ST_.tClass || ST_.sClass || '') : '')
     || '').trim();
-
   var _all = DB.teacher_items || [];
-
-  // صف التاسع: يبدأ بـ 09/
   var _isG9 = _cls.indexOf('09/') === 0;
-
   if(_isG9){
     var _r9 = _all.filter(function(it){
       return (it.name && it.name.indexOf('تجريبي') >= 0)
@@ -735,7 +730,6 @@ const a0_0x3d950d=a0_0x41e7;(function(_0x3de1cb,_0x3b0a80){const _0x302699=a0_0x
     });
     return _r9.length ? _r9 : _all;
   }
-
   var _rn = _all.filter(function(it){
     return !(it.name && it.name.indexOf('تجريبي') >= 0);
   });
@@ -2141,7 +2135,7 @@ window._clearAllRecDocs = async function(){
       _allItems = sec.items;
   });
   var _thItems = _allItems.map(function(it){ return "<th class='tbl-th-item'>" + it.name + "</th>"; }).join("");
-  var _tableHeader = "<tr class='tbl-hdr-row'><th class='tbl-th-sub'>المادة</th><th class='tbl-th-teacher'>المعلم</th>" + _thItems + "</tr>";
+  var _tableHeader = "<tr class='tbl-hdr-row'><th class='tbl-th-sub'>المادة</th><th class='tbl-th-teacher'>المعلم</th>" + _thItems + "<th class='tbl-th-item' style='min-width:65px'>النسبة / التقدير</th></tr>";
 
   // ترتيب: عادي ← PE ← إداري
   var _normalSecs = sections.filter(function(s){ return s.type!=="admin" && s.subject.indexOf("التربية البدنية")<0 && s.subject.indexOf("الرياضة")<0; });
@@ -2173,16 +2167,21 @@ window._clearAllRecDocs = async function(){
         var display;
         if(it.type==="number" && v!=="—"){
           var vN=parseFloat(v),mN=parseFloat(it.max);
-          var isFull=!isNaN(vN)&&!isNaN(mN)&&mN>0&&vN>=mN;
-          var pct2=(!isNaN(vN)&&!isNaN(mN)&&mN>0)?(vN/mN)*100:0;
-          var sc=pct2>=90?"#15803d":pct2>=75?"#0f766e":pct2>=60?"#b45309":pct2>=40?"#c2410c":"#dc2626";
-          if(isFull){display="<span style='background:#0f766e;color:#fff;border-radius:5px;padding:1px 5px;font-size:10px;font-weight:900;'>"+v+" / "+mN+"</span>";}
-          else{display="<span style='color:"+sc+";font-size:10px;font-weight:900;'>"+v+"</span><span style='color:#9ca3af;font-size:10px;font-weight:400;'> / "+mN+"</span>";}
+          display=!isNaN(vN)&&!isNaN(parseFloat(mN))&&parseFloat(mN)>0 ? v+" / "+mN : v;
         }else{display=v;}
         return "<td class='tbl-td-val" + ((!sec.scores[ci]||sec.scores[ci]==="")?(" empty"):"") + "'>" + display + "</td>";
       }).join("");
     }
-        var _gradeCell = ""; // حذف النسبة
+        var _gradeCell = "";
+        if(!isAdmin && !isPE && sec.hasN && !sec.absent && sec.m){
+          var _col = sec.m.col;
+          _gradeCell = "<td class='tbl-td-val' style='text-align:center;min-width:65px;vertical-align:middle'>"
+            + "<div style='font-size:12px;font-weight:900;color:"+_col+"'>"+sec.m.ps+"</div>"
+            + "<div style='display:inline-block;font-size:10px;font-weight:800;background:"+_col+"22;color:"+_col+";border-radius:4px;padding:1px 5px;margin-top:2px'>"+sec.m.lbl+"</div>"
+            + "</td>";
+        } else if(!isAdmin && !isPE){
+          _gradeCell = "<td class='tbl-td-val'>&mdash;</td>";
+        }
     var _statusBadge = (sec.status && sec.status!=="حاضر" && sec.status!=="—")
       ? " <span class='status-badge'>" + sec.status + "</span>" : "";
     var _noteRow = (sec.note && sec.note.trim())
