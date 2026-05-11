@@ -3113,63 +3113,118 @@ function _wrapForPrint(certHTML, name){
 </script>
 
 <script>
-// ===== إصلاح 1: رسالة التعبئة التلقائية عند الحفظ =====
+// ===== إصلاح 1: تعبئة ذكية (الفارغة فقط) + رسالة عند الحفظ =====
 (function(){
+
+  // دالة التعبئة الذكية: تحافظ على المرصود وتعبئ الفارغ فقط
+  window._smartAutoFill = function(isStaff){
+    try{
+      var isS   = isStaff === true || isStaff === "true";
+      var cls   = isS ? ST_.sClass : ST_.tClass;
+      var uname = isS ? (ST_.staff&&ST_.staff.username) : (ST_.teacher&&ST_.teacher.username);
+      if(!cls || !uname) return 0;
+      var items = isS ? (DB.admin_items||[])
+                      : (typeof getTeacherItems==="function"
+                          ? getTeacherItems(ST_.teacher, cls)
+                          : (DB.teacher_items||[]));
+      if(!items.length) return 0;
+      var key      = rKey(isS, uname, cls);
+      var students = gSC(cls);
+      if(!REC[key]) REC[key] = {};
+      var filled = 0;
+      students.forEach(function(stu){
+        var r = REC[key][stu.id] || {};
+        // تخطى الغائب والمعذور
+        if(r.status === "غائب" || r.status === "معذور") return;
+        var oldScores = r.scores ? r.scores.slice() : [];
+        // أنشئ newScores: احتفظ بالقيم الموجودة، عبئ الفارغة فقط
+        var newScores = items.map(function(it, i){
+          var existing = oldScores[i];
+          if(existing !== undefined && existing !== null && existing !== "")
+            return existing; // محفوظ مسبقاً ← لا تغيير
+          // فارغ ← تعبئة تلقائية
+          if(it.type === "number") return String(it.max);
+          if(it.type === "select") return (it.options||[])[0] || "";
+          return "";
+        });
+        var changed = newScores.some(function(v,i){ return v !== oldScores[i]; });
+        if(!changed) return;
+        REC[key][stu.id] = {
+          status: r.status || "حاضر",
+          note:   r.note   || "",
+          scores: newScores
+        };
+        filled++;
+      });
+      return filled;
+    }catch(e){ console.error("_smartAutoFill:", e); return 0; }
+  };
+
+  // حساب الطلاب الذين لديهم بنود فارغة
   function getUnfilledCount(isStaff){
     try{
-      var cls   = isStaff ? ST_.sClass : ST_.tClass;
-      var uname = isStaff ? (ST_.staff&&ST_.staff.username) : (ST_.teacher&&ST_.teacher.username);
+      var isS   = isStaff === true || isStaff === "true";
+      var cls   = isS ? ST_.sClass : ST_.tClass;
+      var uname = isS ? (ST_.staff&&ST_.staff.username) : (ST_.teacher&&ST_.teacher.username);
       if(!cls || !uname) return 0;
-      var items = isStaff ? (DB.admin_items||[]) : (typeof getTeacherItems==="function" ? getTeacherItems(ST_.teacher, cls) : (DB.teacher_items||[]));
+      var items = isS ? (DB.admin_items||[])
+                      : (typeof getTeacherItems==="function"
+                          ? getTeacherItems(ST_.teacher, cls)
+                          : (DB.teacher_items||[]));
       if(!items.length) return 0;
-      var key   = rKey(isStaff, uname, cls);
-      var rec   = REC[key] || {};
+      var key      = rKey(isS, uname, cls);
+      var rec      = REC[key] || {};
       var students = gSC(cls);
-      var count = 0;
+      var count    = 0;
       students.forEach(function(stu){
         var r = rec[stu.id];
-        if(!r || !r.status || r.status==="حاضر"){
-          var scores = r ? (r.scores||[]) : [];
-          var hasEmpty = items.some(function(it,i){ return scores[i]===undefined||scores[i]===""; });
-          if(hasEmpty) count++;
-        }
+        if(r && (r.status==="غائب"||r.status==="معذور")) return;
+        var scores = r ? (r.scores||[]) : [];
+        var hasEmpty = items.some(function(it,i){
+          return scores[i]===undefined || scores[i]===null || scores[i]==="";
+        });
+        if(hasEmpty) count++;
       });
       return count;
     }catch(e){ return 0; }
   }
 
+  // نافذة التأكيد
   function showAutoFillModal(isStaff, onConfirm, onSkip){
-    var unfilledCount = getUnfilledCount(isStaff);
-    if(unfilledCount === 0){ onSkip(); return; }
-
+    var count = getUnfilledCount(isStaff);
+    if(count === 0){ onSkip(); return; }
     var overlay = document.createElement("div");
+    overlay.id = "_afOverlay";
     overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:center;justify-content:center;direction:rtl;font-family:Cairo,sans-serif;";
     overlay.innerHTML =
-      "<div style='background:#fff;border-radius:18px;padding:28px 32px;max-width:420px;width:90%;box-shadow:0 24px 80px rgba(0,0,0,.35);text-align:center;'>"+
+      "<div style='background:#fff;border-radius:18px;padding:28px 32px;max-width:430px;width:90%;box-shadow:0 24px 80px rgba(0,0,0,.35);text-align:center;'>"+
       "<div style='font-size:36px;margin-bottom:10px'>⚡</div>"+
       "<div style='font-size:16px;font-weight:900;color:#1d4ed8;margin-bottom:8px'>تعبئة تلقائية للبنود الفارغة</div>"+
-      "<div style='font-size:13px;color:#374151;line-height:1.75;margin-bottom:6px;'>"+
-      "يوجد <strong style='color:#dc2626;font-size:15px;'>"+unfilledCount+"</strong> طالب لم يتم رصد بنوده بعد.<br>"+
-      "هل تريد تعبئتهم تلقائياً بالدرجة القصوى قبل الحفظ؟"+
+      "<div style='font-size:13px;color:#374151;line-height:1.8;margin-bottom:6px;'>"+
+      "يوجد <strong style='color:#dc2626;font-size:15px;'>"+count+"</strong> طالب لديه بنود غير مرصودة.<br>"+
+      "هل تريد تعبئة <u>البنود الفارغة فقط</u> بالدرجة القصوى؟"+
       "</div>"+
-      "<div style='font-size:11px;color:#9ca3af;margin-bottom:20px;'>سيتم إدخال الحد الأقصى للبنود الرقمية وأول خيار للقوائم</div>"+
+      "<div style='font-size:11px;color:#374151;background:#f0fdf4;border-radius:8px;padding:8px 12px;margin-bottom:18px;border:1px solid #bbf7d0;'>"+
+      "✅ البنود المرصودة مسبقاً <strong>لن تُمس</strong> — فقط الخلايا الفارغة ستُعبَّأ"+
+      "</div>"+
       "<div style='display:flex;gap:10px;justify-content:center;flex-wrap:wrap;'>"+
-      "<button id='_afmYes' style='padding:10px 22px;background:#1d6fa4;color:#fff;border:none;border-radius:9px;cursor:pointer;font-size:13px;font-weight:900;font-family:Cairo,sans-serif;'>⚡ تعبئة ثم حفظ</button>"+
+      "<button id='_afmYes' style='padding:10px 22px;background:#1d6fa4;color:#fff;border:none;border-radius:9px;cursor:pointer;font-size:13px;font-weight:900;font-family:Cairo,sans-serif;'>⚡ تعبئة الفارغة ثم حفظ</button>"+
       "<button id='_afmNo'  style='padding:10px 22px;background:#f3f4f6;color:#374151;border:none;border-radius:9px;cursor:pointer;font-size:13px;font-family:Cairo,sans-serif;'>💾 حفظ بدون تعبئة</button>"+
       "</div></div>";
     document.body.appendChild(overlay);
-
     document.getElementById("_afmYes").onclick = function(){ overlay.remove(); onConfirm(); };
     document.getElementById("_afmNo").onclick  = function(){ overlay.remove(); onSkip(); };
   }
 
+  // اعتراض saveRec
   var _origSaveRec = window.saveRec;
   window.saveRec = function(isStaff){
     var isS = isStaff === true || isStaff === "true";
     var cls = isS ? ST_.sClass : ST_.tClass;
     if(!cls){ if(typeof _origSaveRec==="function") _origSaveRec(isStaff); return; }
     showAutoFillModal(isS, function(){
-      if(typeof autoFill==="function") autoFill(isS);
+      window._smartAutoFill(isS);
+      if(typeof renderTable==="function") try{ renderTable(isS); }catch(e){}
       setTimeout(function(){ if(typeof _origSaveRec==="function") _origSaveRec(isStaff); }, 350);
     }, function(){
       if(typeof _origSaveRec==="function") _origSaveRec(isStaff);
@@ -3187,7 +3242,8 @@ function _wrapForPrint(certHTML, name){
       var cls = isS ? ST_.sClass : ST_.tClass;
       if(!cls) return;
       showAutoFillModal(isS, function(){
-        if(typeof autoFill==="function") autoFill(isS);
+        window._smartAutoFill(isS);
+        if(typeof renderTable==="function") try{ renderTable(isS); }catch(e){}
         setTimeout(function(){ if(typeof window._manualSave==="function") window._manualSave(); }, 350);
       }, function(){
         if(typeof window._manualSave==="function") window._manualSave();
