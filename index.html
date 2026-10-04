@@ -2684,6 +2684,178 @@ function manualSave(){
 
 window._manualSaveReady = function(){ manualSave(); };
 
+// ===== فحص الخانات الفارغة =====
+window._checkEmptyCells = function(isStaff){
+  var _isS = isStaff===true||isStaff==="true";
+  var _cls = _isS ? ST_.sClass : ST_.tClass;
+  var _user = _isS ? ST_.staff?.username : ST_.teacher?.username;
+  var _tchr = ST_.teacher;
+  var _items = _isS ? DB.admin_items : (typeof getTeacherItems==="function"?getTeacherItems(_tchr):[]);
+  if(!_cls||!_user||!_items||!_items.length) return {hasEmpty:false, emptyCount:0, total:0};
+  var _key = rKey(_isS,_user,_cls);
+  var _clsREC = REC[_key]||{};
+  var _students = (typeof gSC==="function"?gSC(_cls):DB.students.filter(s=>s.class===_cls))||[];
+  var emptyCount=0, totalCells=0;
+  _students.forEach(function(stu){
+    var _sd = _clsREC[stu.id];
+    if(!_sd || _sd.status==="غائب" || _sd.status==="معذور") return;
+    _items.forEach(function(item,idx){
+      if(item.type==="number" || item.type==="select"){
+        totalCells++;
+        var _v = (_sd.scores||[])[idx];
+        if(_v===undefined||_v===null||_v==="") emptyCount++;
+      }
+    });
+  });
+  return {hasEmpty:emptyCount>0, emptyCount:emptyCount, total:totalCells, cls:_cls};
+};
+
+// إظهار مربع تنبيه الخانات الفارغة
+window._showEmptyWarning = function(isStaff, onFillMax, onIgnore, onCancel){
+  var _r = window._checkEmptyCells(isStaff);
+  if(!_r.hasEmpty){ onIgnore && onIgnore(); return; }
+
+  // تلوين الخانات الفارغة باللون الأحمر في الجدول
+  window._highlightEmptyCells(isStaff);
+
+  var _msg = "⚠️ يوجد "+_r.emptyCount+" خانة فارغة في صف "+_r.cls+"\n\nاختر أحد الخيارات:";
+  var _modal = document.createElement("div");
+  _modal.id = "_emptyWarnModal";
+  _modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:Cairo,sans-serif;direction:rtl;";
+  _modal.innerHTML = `
+    <div style="background:var(--bg,#1e293b);border:1px solid var(--border,#334155);border-radius:16px;padding:24px;max-width:360px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.5);">
+      <div style="font-size:22px;margin-bottom:8px;">⚠️ خانات فارغة</div>
+      <div style="color:var(--text-s,#94a3b8);font-size:14px;margin-bottom:20px;line-height:1.7">
+        يوجد <strong style="color:#f87171">${_r.emptyCount}</strong> خانة فارغة (رقمية أو قائمة) في صف <strong>${_r.cls}</strong>.<br>
+        الخانات الفارغة ظاهرة باللون الأحمر في الجدول.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button id="_emBtnMax" style="background:#1a9e5e;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:Cairo,sans-serif">
+          ⚡ تعبئة الفارغة بالقيمة العظمى وحفظ
+        </button>
+        <button id="_emBtnSave" style="background:var(--blue,#3b82f6);color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:Cairo,sans-serif">
+          💾 حفظ كما هي (مع الفراغات)
+        </button>
+        <button id="_emBtnCancel" style="background:transparent;color:var(--text-s,#94a3b8);border:1px solid var(--border,#334155);border-radius:10px;padding:10px;font-size:13px;cursor:pointer;font-family:Cairo,sans-serif">
+          🔙 العودة للتعبئة
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(_modal);
+  document.getElementById("_emBtnMax").onclick = function(){
+    _modal.remove(); window._clearEmptyHighlight();
+    onFillMax && onFillMax();
+  };
+  document.getElementById("_emBtnSave").onclick = function(){
+    _modal.remove(); window._clearEmptyHighlight();
+    onIgnore && onIgnore();
+  };
+  document.getElementById("_emBtnCancel").onclick = function(){
+    _modal.remove();
+    onCancel && onCancel();
+  };
+};
+
+// تلوين الخانات الفارغة
+window._highlightEmptyCells = function(isStaff){
+  var _isS = isStaff===true||isStaff==="true";
+  var _tbId = _isS ? "sTB" : "tTB";
+  var _tb = document.getElementById(_tbId);
+  if(!_tb) return;
+  var _cls = _isS ? ST_.sClass : ST_.tClass;
+  var _user = _isS ? ST_.staff?.username : ST_.teacher?.username;
+  var _items = _isS ? DB.admin_items : (typeof getTeacherItems==="function"?getTeacherItems(ST_.teacher):[]);
+  var _key = rKey(_isS,_user,_cls);
+  var _clsREC = REC[_key]||{};
+  var _students = (typeof gSC==="function"?gSC(_cls):DB.students.filter(s=>s.class===_cls))||[];
+  _students.forEach(function(stu){
+    var _sd = _clsREC[stu.id];
+    if(!_sd || _sd.status==="غائب" || _sd.status==="معذور") return;
+    _items.forEach(function(item,idx){
+      if(item.type!=="number" && item.type!=="select") return;
+      var _v = (_sd.scores||[])[idx];
+      if(_v===undefined||_v===null||_v===""){
+        var _rows = _tb.querySelectorAll("tr[data-sid='"+(_isS?'s':'t')+"_"+stu.id+"']");
+        if(_rows.length){
+          // العد الفعلي لعناصر number+select بالترتيب لإيجاد الموضع الصحيح
+          var _allInputs = _rows[0].querySelectorAll(".sinp, td select");
+          // نحسب index بين عناصر number+select فقط
+          var _ni = 0;
+          for(var _ii=0; _ii<_items.length; _ii++){
+            if(_items[_ii].type==="number"||_items[_ii].type==="select"){
+              if(_ii===idx) break;
+              _ni++;
+            }
+          }
+          if(_allInputs[_ni]) _allInputs[_ni].style.cssText += ";border:2px solid #f87171!important;background:rgba(248,113,113,.12)!important;outline:2px solid #f87171!important;";
+        }
+      }
+    });
+  });
+};
+
+// إزالة التلوين
+window._clearEmptyHighlight = function(){
+  document.querySelectorAll(".sinp, td select").forEach(function(el){
+    el.style.border="";
+    el.style.background="";
+    el.style.outline="";
+  });
+};
+
+// تعبئة الفارغة فقط بالقيمة العظمى (دون المسّ بما هو مملوء)
+window._fillEmptyWithMax = function(isStaff){
+  var _isS = isStaff===true||isStaff==="true";
+  var _cls = _isS ? ST_.sClass : ST_.tClass;
+  var _user = _isS ? ST_.staff?.username : ST_.teacher?.username;
+  var _items = _isS ? DB.admin_items : (typeof getTeacherItems==="function"?getTeacherItems(ST_.teacher):[]);
+  var _key = rKey(_isS,_user,_cls);
+  if(!REC[_key]) REC[_key]={};
+  var _students = (typeof gSC==="function"?gSC(_cls):DB.students.filter(s=>s.class===_cls))||[];
+  _students.forEach(function(stu){
+    var _sd = REC[_key][stu.id];
+    if(!_sd || _sd.status==="غائب" || _sd.status==="معذور") return;
+    if(!_sd.scores) _sd.scores = _items.map(()=>"");
+    while(_sd.scores.length<_items.length) _sd.scores.push("");
+    _items.forEach(function(item,idx){
+      if(item.type==="number"){
+        if(_sd.scores[idx]===undefined||_sd.scores[idx]===null||_sd.scores[idx]===""){
+          _sd.scores[idx] = String(item.max);
+        }
+      } else if(item.type==="select"){
+        if(_sd.scores[idx]===undefined||_sd.scores[idx]===null||_sd.scores[idx]===""){
+          // أول خيار في القائمة كقيمة افتراضية
+          _sd.scores[idx] = (item.options&&item.options.length) ? item.options[0] : "";
+        }
+      }
+    });
+  });
+};
+
+// ===== تغليف saveRec لفحص الخانات الفارغة =====
+setTimeout(function(){
+  var _oSR = window.saveRec;
+  if(typeof _oSR==="function") window.saveRec = function(isStaff){
+    var _r = window._checkEmptyCells(isStaff);
+    if(_r.hasEmpty){
+      window._showEmptyWarning(isStaff,
+        function(){ // تعبئة الفارغة بالقيمة العظمى ثم حفظ
+          window._fillEmptyWithMax(isStaff);
+          if(typeof renderTable==="function") renderTable(isStaff);
+          _oSR.call(window,isStaff);
+        },
+        function(){ // حفظ كما هي
+          window._clearEmptyHighlight();
+          _oSR.call(window,isStaff);
+        },
+        null // إغلاق فقط — العودة للتعبئة
+      );
+      return;
+    }
+    _oSR.apply(this,arguments);
+  };
+},2000);
+
 // ===== autoFill + TL/SL + selCls =====
 setTimeout(function(){
   var _oAF=window.autoFill;
@@ -2699,9 +2871,33 @@ setTimeout(function(){
   var _oSC=window.selCls;
   if(typeof _oSC==="function") window.selCls=function(cls,isStaff){
     var _li=typeof ST_!=="undefined"&&(isStaff?!!ST_.staff:!!ST_.teacher);
-    if(window._unsavedChanges&&_li){
-      var cur=typeof ST_!=="undefined"&&(isStaff?ST_.sClass:ST_.tClass);
-      if(cur&&cur!==cls){ var ok=confirm("تنبيه: لم يتم حفظ الرصد في "+cur+". الانتقال الى "+cls+"؟"); if(!ok){return;} window._unsavedChanges=false; }
+    var _cur=typeof ST_!=="undefined"&&(isStaff?ST_.sClass:ST_.tClass);
+    if(_li && _cur && _cur!==cls){
+      // فحص الخانات الفارغة قبل الانتقال
+      var _r = window._checkEmptyCells(isStaff);
+      if(_r.hasEmpty){
+        window._showEmptyWarning(isStaff,
+          function(){ // تعبئة الفارغة بالقيمة العظمى ثم انتقال
+            window._fillEmptyWithMax(isStaff);
+            manualSave();
+            window._clearEmptyHighlight();
+            window._unsavedChanges=false;
+            _oSC.call(window,cls,isStaff);
+          },
+          function(){ // حفظ كما هي ثم انتقال
+            manualSave();
+            window._clearEmptyHighlight();
+            window._unsavedChanges=false;
+            _oSC.call(window,cls,isStaff);
+          },
+          null // البقاء في الصف الحالي
+        );
+        return;
+      } else if(window._unsavedChanges){
+        var ok=confirm("تنبيه: لم يتم حفظ الرصد في "+_cur+". الانتقال الى "+cls+"؟");
+        if(!ok){return;}
+        window._unsavedChanges=false;
+      }
     }
     _oSC.apply(this,arguments);
   };
