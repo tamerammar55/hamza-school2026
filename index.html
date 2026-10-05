@@ -448,7 +448,7 @@ tbody td:nth-child(2){text-align:right}
   <div class="gate-logo">
     <div class="gate-icon">🏫</div>
     <div class="gate-sys" id="gateSysName">نظام الرصد المدرسي الذكي</div>
-    <div class="gate-sch" id="gateSchName">مدرسة حمزة بن عبد المطلب الإعدادية للبنين &nbsp;|&nbsp; 2025 - 2026</div>
+    <div class="gate-sch" id="gateSchName">مدرسة حمزة بن عبد المطلب الإعدادية للبنين</div>
   </div>
   <div class="gate-cards">
     <div class="gate-card admin-c" onclick="selectRole('admin')">
@@ -1478,8 +1478,8 @@ function updateGateway(){
   const sysEl = document.getElementById("gateSysName");
   const schEl = document.getElementById("gateSchName");
   if(sysEl && s.sysName) sysEl.textContent = s.sysName;
-  if(schEl && (s.schName || s.year)){
-    schEl.innerHTML = (s.schName||"") + (s.year ? " &nbsp;|&nbsp; " + s.year : "");
+  if(schEl && s.schName){
+    schEl.textContent = s.schName;
   }
 }
 
@@ -2988,17 +2988,7 @@ function _updateSaveBtnState(){
   if(window._unsavedChanges){b.style.background="#dc2626";b.style.animation="savePulse 1.2s infinite";b.textContent="💾 حفظ الرصد ●";}
   else{b.style.background="#16a34a";b.style.animation="";b.textContent="✅ تم الحفظ";setTimeout(function(){if(!window._unsavedChanges&&b){b.style.background="#1d6fa4";b.textContent="💾 حفظ الرصد";}},2000);}
 }
-(function(){
-  new MutationObserver(function(){
-    var af=document.querySelector('button[onclick*="autoFill"]');
-    if(af&&!document.getElementById("_mainSaveBtn")){
-      var b=document.createElement("button");b.id="_mainSaveBtn";b.textContent="💾 حفظ الرصد";
-      b.onclick=function(){manualSave();};
-      b.style.cssText="background:#1d6fa4;color:#fff;border:none;border-radius:8px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:800;font-family:Cairo,sans-serif;margin-inline-start:6px;transition:background .3s";
-      af.parentNode.insertBefore(b,af.nextSibling);
-    }
-  }).observe(document.body,{childList:true,subtree:true});
-})();
+// _mainSaveBtn removed — أزرار الحفظ في كل تبويب تكفي (btnST و btnSS)
 
 // ===== استيراد من ملف =====
 function importRecordsFromFile(file){
