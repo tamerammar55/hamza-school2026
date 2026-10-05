@@ -2243,77 +2243,157 @@ function exportStudentPDF(){
   const certHTML = certEl.outerHTML;
   const stuName  = (document.querySelector("#parentReport .cert-stu-name")||{}).textContent||"الطالب";
 
-  // بناء HTML الطباعة
+  // بناء HTML الطباعة — تصميم احترافي محسّن
+  const _C = {
+    primary:   '#1a3a6b',   // أزرق ملكي
+    accent:    '#c8a84b',   // ذهبي
+    light:     '#f0f4ff',   // أزرق فاتح جداً
+    light2:    '#eef2fb',   // تدرج صفوف
+    border:    '#c5d0e8',   // حدود خفيفة
+    green:     '#166534',   // إداري أخضر
+    greenBg:   '#f0fdf4',
+    blue:      '#1e40af',   // نائب إداري
+    blueBg:    '#eff6ff',
+    purple:    '#6d28d9',   // مدير
+    purpleBg:  '#faf5ff',
+    text:      '#1e293b',
+    muted:     '#6b7280',
+    teal:      '#0f766e',
+  };
+
   const html = '<!DOCTYPE html><html dir="rtl" lang="ar"><head>'
     + '<meta charset="UTF-8"><title>' + stuName + '</title>'
+    + '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+    + '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">'
     + '<style>'
-    + '@page{size:A4 landscape;margin:0.5cm;}'
+    // صفحة A4 أفقي ممتلئة
+    + '@page{size:A4 landscape;margin:6mm 7mm;}'
     + '*{box-sizing:border-box;margin:0;padding:0;}'
-    + 'html,body{width:100%;}'
-    + 'body{font-family:Arial,sans-serif;direction:rtl;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+    + 'html,body{width:100%;font-family:Cairo,Arial,sans-serif;direction:rtl;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;color:'+_C.text+';}'
+    // الحاوية
     + '.cert-wrap{width:100%;}'
-    + '.cert{border:1.5px solid #0f766e;border-radius:6px;padding:7px 10px;position:relative;padding-right:14px;}'
-    + '.cert::before{content:"";position:absolute;top:0;right:0;bottom:0;width:5px;background:linear-gradient(180deg,#0f766e,#14b8a6);}'
-    + '.cert-hdr{display:flex;align-items:center;gap:10px;padding-bottom:5px;margin-bottom:5px;border-bottom:2px solid #0f766e;}'
-    + '.cert-hdr img{height:40px!important;width:auto!important;flex-shrink:0;}'
+    + '.cert{'
+    +   'border:2px solid '+_C.primary+';'
+    +   'border-radius:8px;'
+    +   'padding:7px 10px 5px;'
+    +   'position:relative;'
+    +   'overflow:hidden;'
+    +   'background:#fff;'
+    + '}'
+    // شريط علوي ذهبي
+    + '.cert::before{'
+    +   'content:"";position:absolute;top:0;left:0;right:0;height:4px;'
+    +   'background:linear-gradient(90deg,'+_C.primary+','+_C.accent+','+_C.primary+');'
+    + '}'
+    // الهيدر
+    + '.cert-hdr{'
+    +   'display:flex;align-items:center;gap:10px;'
+    +   'padding:3px 0 6px;'
+    +   'border-bottom:2px solid '+_C.primary+';'
+    +   'margin-bottom:5px;'
+    + '}'
+    + '.cert-hdr img{height:52px!important;width:auto!important;flex-shrink:0;object-fit:contain;}'
     + '.cert-hdr-center{text-align:center;flex:1;}'
-    + '.cert-school{font-size:11px;font-weight:900;color:#0f766e;line-height:1.5;}'
-    + '.cert-title{font-size:9px;color:#6b7280;font-weight:600;}'
-    + '.cert-report-title{font-size:10px;font-weight:900;color:#134e4a;}'
-    + '.cert-stu{background:#f0fdf9;border:1.5px solid #6ee7b7;border-radius:5px;padding:4px 10px;margin-bottom:5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}'
-    + '.cert-stu-name{font-size:11px;font-weight:900;color:#0f766e;}'
-    + '.cert-stu-info{font-size:9px;color:#6b7280;}'
-    + '.cert-stu-badge{font-size:9px;font-weight:800;background:#0f766e22;color:#0f766e;padding:2px 8px;border-radius:12px;}'
-    + '.cert-table{width:100%;border-collapse:collapse;font-size:10px;table-layout:auto;}'
-    + '.tbl-hdr-row{background:#0f766e;}'
-    + '.tbl-hdr-row th{color:#fff;padding:4px 6px;font-weight:700;font-size:10px;text-align:center;border:1px solid #0d5c56;white-space:nowrap;}'
-    + '.tbl-th-sub{text-align:right!important;padding-right:8px!important;min-width:95px;}'
-    + '.tbl-th-teacher{min-width:75px;}'
-    + '.tbl-th-item{min-width:48px;}'
+    + '.cert-school{font-size:12px;font-weight:900;color:'+_C.primary+';line-height:1.4;}'
+    + '.cert-title{font-size:9.5px;color:'+_C.muted+';font-weight:600;margin:1px 0;}'
+    + '.cert-report-title{'
+    +   'font-size:13px;font-weight:900;color:'+_C.accent+';'
+    +   'text-shadow:0 1px 2px rgba(0,0,0,.08);'
+    + '}'
+    // بيانات الطالب
+    + '.cert-stu{'
+    +   'background:linear-gradient(135deg,'+_C.light+','+_C.light2+');'
+    +   'border:1.5px solid '+_C.primary+'33;'
+    +   'border-radius:7px;'
+    +   'padding:5px 12px;'
+    +   'margin-bottom:5px;'
+    +   'display:flex;gap:14px;align-items:center;flex-wrap:wrap;'
+    + '}'
+    + '.cert-stu-name{font-size:13px;font-weight:900;color:'+_C.primary+';}'
+    + '.cert-stu-info{font-size:9.5px;color:'+_C.muted+';}'
+    + '.cert-stu-badge{'
+    +   'background:'+_C.primary+';color:#fff;'
+    +   'padding:2px 11px;border-radius:20px;'
+    +   'font-size:10px;font-weight:700;'
+    + '}'
+    // جدول المواد
+    + '.cert-table{width:100%;border-collapse:collapse;font-size:9.5px;table-layout:fixed;}'
+    + '.tbl-hdr-row{background:'+_C.primary+';}'
+    + '.tbl-hdr-row th{'
+    +   'color:#fff;padding:5px 5px;font-weight:800;font-size:9px;'
+    +   'text-align:center;border:1px solid #14307a;white-space:nowrap;'
+    + '}'
+    + '.tbl-th-sub{text-align:right!important;padding-right:8px!important;width:100px;}'
+    + '.tbl-th-teacher{width:78px;}'
+    + '.tbl-th-item{}'
     + '.tbl-th-grade{display:none;}'
-    + '.tbl-row td{padding:6px 5px;border:0.5px solid #d1fae5;vertical-align:middle;white-space:nowrap;}'
-    + '.tbl-row.even{background:#f0fdf9;}'
-    + '.tbl-row.odd{background:#ffffff;}'
-    + '.tbl-row.pe-row td{background:#f0fdf4!important;}'
-    + '.tbl-row.admin-row td{background:#eff6ff!important;border-top:2px solid #3b82f6!important;}'
-    + '.tbl-td-sub{font-weight:800;color:#0f766e;font-size:10px;border-right:2.5px solid #0f766e!important;}'
-    + '.tbl-td-sub.admin{color:#1d4ed8;border-right:2.5px solid #3b82f6!important;}'
-    + '.tbl-td-sub.pe{color:#166534;border-right:2.5px solid #16a34a!important;}'
-    + '.tbl-td-teacher{font-size:8px;color:#6b7280;}'
-    + '.tbl-td-val{text-align:center;font-size:10px;font-weight:900;color:#1a2332;}'
-    + '.tbl-td-val.empty{color:#9ca3af;font-weight:400;}'
-    + '.score-wrap{display:inline-flex;align-items:baseline;gap:1px;}'
-    + '.score-num{font-size:11px;font-weight:900;color:#0f766e;}'
-    + '.score-max{font-size:8px;color:#9ca3af;font-weight:500;}'
-    + '.score-sep{font-size:8px;color:#9ca3af;}'
-    + '.score-full{color:#fff!important;background:#0f766e;border-radius:4px;padding:1px 4px;font-size:9.5px;font-weight:900;}'
+    + '.tbl-row td{'
+    +   'padding:5px 4px;border:0.5px solid '+_C.border+';'
+    +   'vertical-align:middle;text-align:center;'
+    + '}'
+    + '.tbl-row:last-child td{border-bottom:1.5px solid '+_C.primary+'44;}'
+    + '.tbl-row.even{background:'+_C.light+';}'
+    + '.tbl-row.odd{background:#fff;}'
+    + '.tbl-row.admin-row td{'
+    +   'background:'+_C.blueBg+'!important;'
+    +   'border-top:1.5px solid #3b82f644!important;'
+    + '}'
+    + '.tbl-row.pe-row td{background:'+_C.greenBg+'!important;}'
+    // خلية المادة
+    + '.tbl-td-sub{'
+    +   'font-weight:900;color:'+_C.primary+';font-size:9.5px;'
+    +   'text-align:right!important;padding-right:7px!important;'
+    +   'border-right:3px solid '+_C.primary+'!important;'
+    + '}'
+    + '.tbl-td-sub.admin{color:'+_C.blue+';border-right:3px solid '+_C.blue+'!important;}'
+    + '.tbl-td-sub.pe{color:'+_C.green+';border-right:3px solid #16a34a!important;}'
+    // خلية المعلم
+    + '.tbl-td-teacher{font-size:8px;color:'+_C.muted+';text-align:right!important;padding-right:5px!important;}'
+    // الدرجات
+    + '.tbl-td-val{text-align:center;font-size:10px;font-weight:800;color:'+_C.text+';}'
+    + '.tbl-td-val.empty{color:#9ca3af;font-weight:400;letter-spacing:1px;}'
+    + '.score-wrap{display:inline-flex;align-items:baseline;gap:0;}'
+    + '.score-num{font-size:11px;font-weight:900;color:'+_C.primary+';}'
+    + '.score-max{font-size:7.5px;color:#aab0bc;font-weight:500;}'
+    + '.score-sep{font-size:7.5px;color:#c0c7d4;}'
+    + '.score-full{'
+    +   'color:#fff!important;'
+    +   'background:'+_C.primary+';'
+    +   'border-radius:5px;padding:1px 5px;'
+    +   'font-size:9.5px;font-weight:900;'
+    +   'box-shadow:0 1px 3px rgba(26,58,107,.25);'
+    + '}'
     + '.tbl-td-grade{text-align:center;white-space:nowrap;}'
-    + '.tbl-td-admin{font-size:8.5px;color:#1e40af;line-height:1.8;}'
-    + '.tbl-td-pe{font-size:8.5px;color:#166534;line-height:1.8;}'
+    + '.tbl-td-admin{font-size:8.5px;color:'+_C.blue+';line-height:1.9;text-align:right!important;padding-right:7px!important;}'
+    + '.tbl-td-pe{font-size:8.5px;color:'+_C.green+';line-height:1.9;text-align:right!important;padding-right:7px!important;}'
     + '.grade-pill{display:none;}'
     + '.grade-empty{display:none;}'
-    + '.status-badge{font-size:8px;background:#fee2e2;color:#991b1b;padding:1px 5px;border-radius:8px;}'
-    + '.adm-item{display:inline-flex;align-items:center;gap:3px;margin-left:8px;font-size:8.5px;}'
-    + '.adm-lbl{color:#6b7280;font-size:8px;}'
-    + '.note-row .note-cell{font-size:8px;color:#78350f;background:#fffbeb;padding:3px 8px;}'
-    + '.no-data{text-align:center;padding:15px;color:#9ca3af;font-size:10px;}'
-    + '.cert-sigs{display:flex;justify-content:space-between;align-items:center;padding-top:5px;margin-top:5px;border-top:1.5px dashed #6ee7b7;gap:4px;}'
-    + '.cert-sig{text-align:center;flex:1;}'
-    + '.cert-sig-title{font-size:9px;color:#6b7280;font-weight:700;}'
-    + '.cert-sig-line{font-size:10px;color:#0f766e;font-weight:900;}'
-    + '.cert-sig-line.admin-sig{color:#1d4ed8;}'
-    + '.cert-date{font-size:9px;color:#0f766e;font-weight:800;text-align:center;flex:1;}'
-    + '.cert-actions{display:none!important;}'
-    + '@media(max-width:600px){'
-    + '.cert-table{font-size:8px;}'
-    + '.tbl-hdr-row th{padding:3px 4px;font-size:8px;}'
-    + '.tbl-row td{padding:3px 4px;font-size:8px;white-space:normal;word-break:break-word;}'
-    + '.tbl-td-sub{font-size:8px;min-width:70px;}'
-    + '.tbl-td-teacher{font-size:7px;max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'
-    + '.cert-stu-name{font-size:9px;}'
-    + '.cert-school{font-size:9px;}'
-    + '.cert-hdr img{height:28px!important;}'
+    + '.status-badge{font-size:8px;background:#fee2e2;color:#991b1b;padding:1px 5px;border-radius:8px;margin-right:3px;}'
+    + '.adm-item{display:inline-flex;align-items:center;gap:2px;margin-left:10px;font-size:8.5px;}'
+    + '.adm-lbl{color:'+_C.muted+';font-size:8px;}'
+    + '.note-row .note-cell{font-size:8px;color:#78350f;background:#fffbeb;padding:3px 8px;text-align:right;}'
+    + '.no-data{text-align:center;padding:20px;color:'+_C.muted+';font-size:10px;}'
+    // التوقيعات
+    + '.cert-sigs{'
+    +   'display:flex;justify-content:space-between;align-items:stretch;'
+    +   'padding-top:6px;margin-top:5px;'
+    +   'border-top:1.5px dashed '+_C.primary+'55;'
+    +   'gap:8px;'
     + '}'
+    + '.cert-sig{'
+    +   'text-align:center;flex:1;'
+    +   'padding:5px 10px;'
+    +   'border-radius:7px;'
+    +   'border:1px solid '+_C.border+';'
+    + '}'
+    + '.cert-sig-title{font-size:9px;color:'+_C.muted+';font-weight:700;margin-bottom:4px;}'
+    + '.cert-sig-line{font-size:11px;font-weight:900;border-top:1.5px solid currentColor;padding-top:3px;margin-top:2px;}'
+    + '.cert-date{'
+    +   'font-size:10px;color:'+_C.primary+';font-weight:800;'
+    +   'text-align:center;flex:0.8;'
+    +   'display:flex;align-items:center;justify-content:center;'
+    + '}'
+    + '.cert-actions{display:none!important;}'
     + '@media print{.cert-actions,.btn,.toast{display:none!important;}}'
     + '</style></head><body>'+ certHTML
     + '</body></html>';
@@ -2684,151 +2764,6 @@ function manualSave(){
 
 window._manualSaveReady = function(){ manualSave(); };
 
-// ===== فحص الخانات الفارغة =====
-window._checkEmptyCells = function(isStaff){
-  var _isS = isStaff===true||isStaff==="true";
-  var _cls = _isS ? ST_.sClass : ST_.tClass;
-  var _user = _isS ? ST_.staff?.username : ST_.teacher?.username;
-  var _tchr = ST_.teacher;
-  var _items = _isS ? DB.admin_items : (typeof getTeacherItems==="function"?getTeacherItems(_tchr):[]);
-  if(!_cls||!_user||!_items||!_items.length) return {hasEmpty:false, emptyCount:0, total:0};
-  var _key = rKey(_isS,_user,_cls);
-  var _clsREC = REC[_key]||{};
-  var _students = (typeof gSC==="function"?gSC(_cls):DB.students.filter(s=>s.class===_cls))||[];
-  var emptyCount=0, totalCells=0;
-  _students.forEach(function(stu){
-    var _sd = _clsREC[stu.id];
-    // يشمل الطلاب الذين لم يُدخَل لهم أي بيانات بعد
-    if(_sd && (_sd.status==="غائب" || _sd.status==="معذور")) return;
-    _items.forEach(function(item,idx){
-      if(item.type==="number" || item.type==="select"){
-        totalCells++;
-        var _v = _sd ? (_sd.scores||[])[idx] : undefined;
-        if(_v===undefined||_v===null||_v==="") emptyCount++;
-      }
-    });
-  });
-  return {hasEmpty:emptyCount>0, emptyCount:emptyCount, total:totalCells, cls:_cls};
-};
-
-// إظهار نافذة تنبيه الخانات الفارغة
-window._showEmptyWarning = function(isStaff, onFillMax, onIgnore, onCancel){
-  var _r = window._checkEmptyCells(isStaff);
-  if(!_r.hasEmpty){ onIgnore && onIgnore(); return; }
-  window._highlightEmptyCells(isStaff);
-  var _modal = document.createElement("div");
-  _modal.id = "_emptyWarnModal";
-  _modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:Cairo,sans-serif;direction:rtl;";
-  _modal.innerHTML = `
-    <div style="background:var(--bg,#1e293b);border:1px solid var(--border,#334155);border-radius:16px;padding:24px;max-width:360px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.5);">
-      <div style="font-size:20px;font-weight:800;margin-bottom:8px;">⚠️ خانات فارغة</div>
-      <div style="color:var(--text-s,#94a3b8);font-size:14px;margin-bottom:20px;line-height:1.7">
-        يوجد <strong style="color:#f87171">${_r.emptyCount}</strong> خانة فارغة (رقمية أو قائمة) في صف <strong>${_r.cls}</strong>.<br>
-        الخانات الفارغة ظاهرة باللون الأحمر في الجدول.
-      </div>
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <button id="_emBtnMax" style="background:#1a9e5e;color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:Cairo,sans-serif">
-          ⚡ تعبئة الفارغة بالقيمة العظمى وحفظ
-        </button>
-        <button id="_emBtnSave" style="background:var(--blue,#3b82f6);color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:Cairo,sans-serif">
-          💾 حفظ كما هي (مع الفراغات)
-        </button>
-        <button id="_emBtnCancel" style="background:transparent;color:var(--text-s,#94a3b8);border:1px solid var(--border,#334155);border-radius:10px;padding:10px;font-size:13px;cursor:pointer;font-family:Cairo,sans-serif">
-          🔙 العودة للتعبئة
-        </button>
-      </div>
-    </div>`;
-  document.body.appendChild(_modal);
-  document.getElementById("_emBtnMax").onclick = function(){ _modal.remove(); window._clearEmptyHighlight(); onFillMax && onFillMax(); };
-  document.getElementById("_emBtnSave").onclick = function(){ _modal.remove(); window._clearEmptyHighlight(); onIgnore && onIgnore(); };
-  document.getElementById("_emBtnCancel").onclick = function(){ _modal.remove(); onCancel && onCancel(); };
-};
-
-// تلوين الخانات الفارغة في الجدول
-window._highlightEmptyCells = function(isStaff){
-  var _isS = isStaff===true||isStaff==="true";
-  var _tbId = _isS ? "sTB" : "tTB";
-  var _tb = document.getElementById(_tbId);
-  if(!_tb) return;
-  var _cls = _isS ? ST_.sClass : ST_.tClass;
-  var _user = _isS ? ST_.staff?.username : ST_.teacher?.username;
-  var _items = _isS ? DB.admin_items : (typeof getTeacherItems==="function"?getTeacherItems(ST_.teacher):[]);
-  var _key = rKey(_isS,_user,_cls);
-  var _clsREC = REC[_key]||{};
-  var _students = (typeof gSC==="function"?gSC(_cls):DB.students.filter(s=>s.class===_cls))||[];
-  _students.forEach(function(stu){
-    var _sd = _clsREC[stu.id];
-    if(_sd && (_sd.status==="غائب" || _sd.status==="معذور")) return;
-    var _numIdx=0; // عداد للعناصر number+select فقط
-    _items.forEach(function(item,idx){
-      if(item.type!=="number" && item.type!=="select") return;
-      var _v = _sd ? (_sd.scores||[])[idx] : undefined;
-      if(_v===undefined||_v===null||_v===""){
-        var _rows = _tb.querySelectorAll("tr[data-sid='"+(_isS?'s':'t')+"_"+stu.id+"']");
-        if(_rows.length){
-          var _allInputs = _rows[0].querySelectorAll(".sinp, td select");
-          if(_allInputs[_numIdx]) _allInputs[_numIdx].style.cssText += ";border:2px solid #f87171!important;background:rgba(248,113,113,.12)!important;outline:2px solid #f87171!important;";
-        }
-      }
-      _numIdx++;
-    });
-  });
-};
-
-// إزالة التلوين
-window._clearEmptyHighlight = function(){
-  document.querySelectorAll(".sinp, td select").forEach(function(el){
-    el.style.border=""; el.style.background=""; el.style.outline="";
-  });
-};
-
-// تعبئة جميع الخانات الفارغة بالقيمة العظمى — بما فيها الطلاب غير المُدخَلين
-window._fillEmptyWithMax = function(isStaff){
-  var _isS = isStaff===true||isStaff==="true";
-  var _cls = _isS ? ST_.sClass : ST_.tClass;
-  var _user = _isS ? ST_.staff?.username : ST_.teacher?.username;
-  var _items = _isS ? DB.admin_items : (typeof getTeacherItems==="function"?getTeacherItems(ST_.teacher):[]);
-  var _key = rKey(_isS,_user,_cls);
-  if(!REC[_key]) REC[_key]={};
-  var _students = (typeof gSC==="function"?gSC(_cls):DB.students.filter(s=>s.class===_cls))||[];
-  _students.forEach(function(stu){
-    // إنشاء سجل للطالب إن لم يكن موجوداً
-    if(!REC[_key][stu.id]) REC[_key][stu.id] = {status:"", scores:[]};
-    var _sd = REC[_key][stu.id];
-    if(_sd.status==="غائب" || _sd.status==="معذور") return;
-    if(!_sd.scores) _sd.scores = [];
-    while(_sd.scores.length<_items.length) _sd.scores.push("");
-    _items.forEach(function(item,idx){
-      if(item.type==="number"){
-        if(_sd.scores[idx]===undefined||_sd.scores[idx]===null||_sd.scores[idx]===""){
-          _sd.scores[idx] = String(item.max);
-        }
-      } else if(item.type==="select"){
-        if(_sd.scores[idx]===undefined||_sd.scores[idx]===null||_sd.scores[idx]===""){
-          _sd.scores[idx] = (item.options&&item.options.length) ? item.options[0] : "";
-        }
-      }
-    });
-  });
-};
-
-// ===== تغليف saveRec لفحص الخانات الفارغة =====
-setTimeout(function(){
-  var _oSR = window.saveRec;
-  if(typeof _oSR==="function") window.saveRec = function(isStaff){
-    var _r = window._checkEmptyCells(isStaff);
-    if(_r.hasEmpty){
-      window._showEmptyWarning(isStaff,
-        function(){ window._fillEmptyWithMax(isStaff); if(typeof renderTable==="function") renderTable(isStaff); _oSR.call(window,isStaff); },
-        function(){ window._clearEmptyHighlight(); _oSR.call(window,isStaff); },
-        null
-      );
-      return;
-    }
-    _oSR.apply(this,arguments);
-  };
-},2000);
-
 // ===== autoFill + TL/SL + selCls =====
 setTimeout(function(){
   var _oAF=window.autoFill;
@@ -2844,21 +2779,9 @@ setTimeout(function(){
   var _oSC=window.selCls;
   if(typeof _oSC==="function") window.selCls=function(cls,isStaff){
     var _li=typeof ST_!=="undefined"&&(isStaff?!!ST_.staff:!!ST_.teacher);
-    var _cur=typeof ST_!=="undefined"&&(isStaff?ST_.sClass:ST_.tClass);
-    if(_li && _cur && _cur!==cls){
-      var _r = window._checkEmptyCells(isStaff);
-      if(_r.hasEmpty){
-        window._showEmptyWarning(isStaff,
-          function(){ window._fillEmptyWithMax(isStaff); manualSave(); window._clearEmptyHighlight(); window._unsavedChanges=false; _oSC.call(window,cls,isStaff); },
-          function(){ manualSave(); window._clearEmptyHighlight(); window._unsavedChanges=false; _oSC.call(window,cls,isStaff); },
-          null
-        );
-        return;
-      } else if(window._unsavedChanges){
-        var ok=confirm("تنبيه: لم يتم حفظ الرصد في "+_cur+". الانتقال الى "+cls+"؟");
-        if(!ok){return;}
-        window._unsavedChanges=false;
-      }
+    if(window._unsavedChanges&&_li){
+      var cur=typeof ST_!=="undefined"&&(isStaff?ST_.sClass:ST_.tClass);
+      if(cur&&cur!==cls){ var ok=confirm("تنبيه: لم يتم حفظ الرصد في "+cur+". الانتقال الى "+cls+"؟"); if(!ok){return;} window._unsavedChanges=false; }
     }
     _oSC.apply(this,arguments);
   };
