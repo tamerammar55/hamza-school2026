@@ -448,7 +448,7 @@ tbody td:nth-child(2){text-align:right}
   <div class="gate-logo">
     <div class="gate-icon">🏫</div>
     <div class="gate-sys" id="gateSysName">نظام الرصد المدرسي الذكي</div>
-    <div class="gate-sch" id="gateSchName">مدرسة حمزة بن عبد المطلب الإعدادية للبنين</div>
+    <div class="gate-sch" id="gateSchName">مدرسة حمزة بن عبد المطلب الإعدادية للبنين &nbsp;|&nbsp; 2025 - 2026</div>
   </div>
   <div class="gate-cards">
     <div class="gate-card admin-c" onclick="selectRole('admin')">
@@ -1478,8 +1478,8 @@ function updateGateway(){
   const sysEl = document.getElementById("gateSysName");
   const schEl = document.getElementById("gateSchName");
   if(sysEl && s.sysName) sysEl.textContent = s.sysName;
-  if(schEl && s.schName){
-    schEl.textContent = s.schName;
+  if(schEl && (s.schName || s.year)){
+    schEl.innerHTML = (s.schName||"") + (s.year ? " &nbsp;|&nbsp; " + s.year : "");
   }
 }
 
@@ -2207,7 +2207,7 @@ window._clearAllRecDocs = async function(){
     +   "</div>"
     +   "<div class='cert-sig' style='border:2px solid #1e40af;border-radius:8px;padding:5px 12px;background:#eff6ff;'>"
     +     "<div class='cert-sig-title' style='color:#1e40af;font-weight:900;font-size:10px;'>النائب الإداري</div>"
-    +     "<div class='cert-sig-line' style='color:#1d4ed8;font-size:11px;font-weight:900;'>ناصر الهيل</div>"
+    +     "<div class='cert-sig-line' style='color:#1d4ed8;font-size:11px;font-weight:900;'>ناصر جاسم الهيل</div>"
     +   "</div>"
     +   "<div class='cert-date'>📅 "+date+"</div>"
     +   "<div class='cert-sig' style='border:2px solid #7c3aed;border-radius:8px;padding:5px 12px;background:#faf5ff;'>"
@@ -2698,11 +2698,12 @@ window._checkEmptyCells = function(isStaff){
   var emptyCount=0, totalCells=0;
   _students.forEach(function(stu){
     var _sd = _clsREC[stu.id];
-    if(!_sd || _sd.status==="غائب" || _sd.status==="معذور") return;
+    // يشمل الطلاب الذين لم يُدخَل لهم أي بيانات بعد
+    if(_sd && (_sd.status==="غائب" || _sd.status==="معذور")) return;
     _items.forEach(function(item,idx){
       if(item.type==="number" || item.type==="select"){
         totalCells++;
-        var _v = (_sd.scores||[])[idx];
+        var _v = _sd ? (_sd.scores||[])[idx] : undefined;
         if(_v===undefined||_v===null||_v==="") emptyCount++;
       }
     });
@@ -2710,21 +2711,17 @@ window._checkEmptyCells = function(isStaff){
   return {hasEmpty:emptyCount>0, emptyCount:emptyCount, total:totalCells, cls:_cls};
 };
 
-// إظهار مربع تنبيه الخانات الفارغة
+// إظهار نافذة تنبيه الخانات الفارغة
 window._showEmptyWarning = function(isStaff, onFillMax, onIgnore, onCancel){
   var _r = window._checkEmptyCells(isStaff);
   if(!_r.hasEmpty){ onIgnore && onIgnore(); return; }
-
-  // تلوين الخانات الفارغة باللون الأحمر في الجدول
   window._highlightEmptyCells(isStaff);
-
-  var _msg = "⚠️ يوجد "+_r.emptyCount+" خانة فارغة في صف "+_r.cls+"\n\nاختر أحد الخيارات:";
   var _modal = document.createElement("div");
   _modal.id = "_emptyWarnModal";
   _modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:Cairo,sans-serif;direction:rtl;";
   _modal.innerHTML = `
     <div style="background:var(--bg,#1e293b);border:1px solid var(--border,#334155);border-radius:16px;padding:24px;max-width:360px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.5);">
-      <div style="font-size:22px;margin-bottom:8px;">⚠️ خانات فارغة</div>
+      <div style="font-size:20px;font-weight:800;margin-bottom:8px;">⚠️ خانات فارغة</div>
       <div style="color:var(--text-s,#94a3b8);font-size:14px;margin-bottom:20px;line-height:1.7">
         يوجد <strong style="color:#f87171">${_r.emptyCount}</strong> خانة فارغة (رقمية أو قائمة) في صف <strong>${_r.cls}</strong>.<br>
         الخانات الفارغة ظاهرة باللون الأحمر في الجدول.
@@ -2742,21 +2739,12 @@ window._showEmptyWarning = function(isStaff, onFillMax, onIgnore, onCancel){
       </div>
     </div>`;
   document.body.appendChild(_modal);
-  document.getElementById("_emBtnMax").onclick = function(){
-    _modal.remove(); window._clearEmptyHighlight();
-    onFillMax && onFillMax();
-  };
-  document.getElementById("_emBtnSave").onclick = function(){
-    _modal.remove(); window._clearEmptyHighlight();
-    onIgnore && onIgnore();
-  };
-  document.getElementById("_emBtnCancel").onclick = function(){
-    _modal.remove();
-    onCancel && onCancel();
-  };
+  document.getElementById("_emBtnMax").onclick = function(){ _modal.remove(); window._clearEmptyHighlight(); onFillMax && onFillMax(); };
+  document.getElementById("_emBtnSave").onclick = function(){ _modal.remove(); window._clearEmptyHighlight(); onIgnore && onIgnore(); };
+  document.getElementById("_emBtnCancel").onclick = function(){ _modal.remove(); onCancel && onCancel(); };
 };
 
-// تلوين الخانات الفارغة
+// تلوين الخانات الفارغة في الجدول
 window._highlightEmptyCells = function(isStaff){
   var _isS = isStaff===true||isStaff==="true";
   var _tbId = _isS ? "sTB" : "tTB";
@@ -2770,26 +2758,19 @@ window._highlightEmptyCells = function(isStaff){
   var _students = (typeof gSC==="function"?gSC(_cls):DB.students.filter(s=>s.class===_cls))||[];
   _students.forEach(function(stu){
     var _sd = _clsREC[stu.id];
-    if(!_sd || _sd.status==="غائب" || _sd.status==="معذور") return;
+    if(_sd && (_sd.status==="غائب" || _sd.status==="معذور")) return;
+    var _numIdx=0; // عداد للعناصر number+select فقط
     _items.forEach(function(item,idx){
       if(item.type!=="number" && item.type!=="select") return;
-      var _v = (_sd.scores||[])[idx];
+      var _v = _sd ? (_sd.scores||[])[idx] : undefined;
       if(_v===undefined||_v===null||_v===""){
         var _rows = _tb.querySelectorAll("tr[data-sid='"+(_isS?'s':'t')+"_"+stu.id+"']");
         if(_rows.length){
-          // العد الفعلي لعناصر number+select بالترتيب لإيجاد الموضع الصحيح
           var _allInputs = _rows[0].querySelectorAll(".sinp, td select");
-          // نحسب index بين عناصر number+select فقط
-          var _ni = 0;
-          for(var _ii=0; _ii<_items.length; _ii++){
-            if(_items[_ii].type==="number"||_items[_ii].type==="select"){
-              if(_ii===idx) break;
-              _ni++;
-            }
-          }
-          if(_allInputs[_ni]) _allInputs[_ni].style.cssText += ";border:2px solid #f87171!important;background:rgba(248,113,113,.12)!important;outline:2px solid #f87171!important;";
+          if(_allInputs[_numIdx]) _allInputs[_numIdx].style.cssText += ";border:2px solid #f87171!important;background:rgba(248,113,113,.12)!important;outline:2px solid #f87171!important;";
         }
       }
+      _numIdx++;
     });
   });
 };
@@ -2797,13 +2778,11 @@ window._highlightEmptyCells = function(isStaff){
 // إزالة التلوين
 window._clearEmptyHighlight = function(){
   document.querySelectorAll(".sinp, td select").forEach(function(el){
-    el.style.border="";
-    el.style.background="";
-    el.style.outline="";
+    el.style.border=""; el.style.background=""; el.style.outline="";
   });
 };
 
-// تعبئة الفارغة فقط بالقيمة العظمى (دون المسّ بما هو مملوء)
+// تعبئة جميع الخانات الفارغة بالقيمة العظمى — بما فيها الطلاب غير المُدخَلين
 window._fillEmptyWithMax = function(isStaff){
   var _isS = isStaff===true||isStaff==="true";
   var _cls = _isS ? ST_.sClass : ST_.tClass;
@@ -2813,9 +2792,11 @@ window._fillEmptyWithMax = function(isStaff){
   if(!REC[_key]) REC[_key]={};
   var _students = (typeof gSC==="function"?gSC(_cls):DB.students.filter(s=>s.class===_cls))||[];
   _students.forEach(function(stu){
+    // إنشاء سجل للطالب إن لم يكن موجوداً
+    if(!REC[_key][stu.id]) REC[_key][stu.id] = {status:"", scores:[]};
     var _sd = REC[_key][stu.id];
-    if(!_sd || _sd.status==="غائب" || _sd.status==="معذور") return;
-    if(!_sd.scores) _sd.scores = _items.map(()=>"");
+    if(_sd.status==="غائب" || _sd.status==="معذور") return;
+    if(!_sd.scores) _sd.scores = [];
     while(_sd.scores.length<_items.length) _sd.scores.push("");
     _items.forEach(function(item,idx){
       if(item.type==="number"){
@@ -2824,7 +2805,6 @@ window._fillEmptyWithMax = function(isStaff){
         }
       } else if(item.type==="select"){
         if(_sd.scores[idx]===undefined||_sd.scores[idx]===null||_sd.scores[idx]===""){
-          // أول خيار في القائمة كقيمة افتراضية
           _sd.scores[idx] = (item.options&&item.options.length) ? item.options[0] : "";
         }
       }
@@ -2839,16 +2819,9 @@ setTimeout(function(){
     var _r = window._checkEmptyCells(isStaff);
     if(_r.hasEmpty){
       window._showEmptyWarning(isStaff,
-        function(){ // تعبئة الفارغة بالقيمة العظمى ثم حفظ
-          window._fillEmptyWithMax(isStaff);
-          if(typeof renderTable==="function") renderTable(isStaff);
-          _oSR.call(window,isStaff);
-        },
-        function(){ // حفظ كما هي
-          window._clearEmptyHighlight();
-          _oSR.call(window,isStaff);
-        },
-        null // إغلاق فقط — العودة للتعبئة
+        function(){ window._fillEmptyWithMax(isStaff); if(typeof renderTable==="function") renderTable(isStaff); _oSR.call(window,isStaff); },
+        function(){ window._clearEmptyHighlight(); _oSR.call(window,isStaff); },
+        null
       );
       return;
     }
@@ -2873,24 +2846,12 @@ setTimeout(function(){
     var _li=typeof ST_!=="undefined"&&(isStaff?!!ST_.staff:!!ST_.teacher);
     var _cur=typeof ST_!=="undefined"&&(isStaff?ST_.sClass:ST_.tClass);
     if(_li && _cur && _cur!==cls){
-      // فحص الخانات الفارغة قبل الانتقال
       var _r = window._checkEmptyCells(isStaff);
       if(_r.hasEmpty){
         window._showEmptyWarning(isStaff,
-          function(){ // تعبئة الفارغة بالقيمة العظمى ثم انتقال
-            window._fillEmptyWithMax(isStaff);
-            manualSave();
-            window._clearEmptyHighlight();
-            window._unsavedChanges=false;
-            _oSC.call(window,cls,isStaff);
-          },
-          function(){ // حفظ كما هي ثم انتقال
-            manualSave();
-            window._clearEmptyHighlight();
-            window._unsavedChanges=false;
-            _oSC.call(window,cls,isStaff);
-          },
-          null // البقاء في الصف الحالي
+          function(){ window._fillEmptyWithMax(isStaff); manualSave(); window._clearEmptyHighlight(); window._unsavedChanges=false; _oSC.call(window,cls,isStaff); },
+          function(){ manualSave(); window._clearEmptyHighlight(); window._unsavedChanges=false; _oSC.call(window,cls,isStaff); },
+          null
         );
         return;
       } else if(window._unsavedChanges){
@@ -2988,7 +2949,17 @@ function _updateSaveBtnState(){
   if(window._unsavedChanges){b.style.background="#dc2626";b.style.animation="savePulse 1.2s infinite";b.textContent="💾 حفظ الرصد ●";}
   else{b.style.background="#16a34a";b.style.animation="";b.textContent="✅ تم الحفظ";setTimeout(function(){if(!window._unsavedChanges&&b){b.style.background="#1d6fa4";b.textContent="💾 حفظ الرصد";}},2000);}
 }
-// _mainSaveBtn removed — أزرار الحفظ في كل تبويب تكفي (btnST و btnSS)
+(function(){
+  new MutationObserver(function(){
+    var af=document.querySelector('button[onclick*="autoFill"]');
+    if(af&&!document.getElementById("_mainSaveBtn")){
+      var b=document.createElement("button");b.id="_mainSaveBtn";b.textContent="💾 حفظ الرصد";
+      b.onclick=function(){manualSave();};
+      b.style.cssText="background:#1d6fa4;color:#fff;border:none;border-radius:8px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:800;font-family:Cairo,sans-serif;margin-inline-start:6px;transition:background .3s";
+      af.parentNode.insertBefore(b,af.nextSibling);
+    }
+  }).observe(document.body,{childList:true,subtree:true});
+})();
 
 // ===== استيراد من ملف =====
 function importRecordsFromFile(file){
