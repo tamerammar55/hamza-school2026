@@ -448,7 +448,7 @@ tbody td:nth-child(2){text-align:right}
   <div class="gate-logo">
     <div class="gate-icon">🏫</div>
     <div class="gate-sys" id="gateSysName">نظام الرصد المدرسي الذكي</div>
-    <div class="gate-sch" id="gateSchName">مدرسة حمزة بن عبد المطلب الإعدادية للبنين &nbsp;|&nbsp; 2025 - 2026</div>
+    <div class="gate-sch" id="gateSchName">مدرسة حمزة بن عبد المطلب الإعدادية للبنين</div>
   </div>
   <div class="gate-cards">
     <div class="gate-card admin-c" onclick="selectRole('admin')">
@@ -486,7 +486,7 @@ tbody td:nth-child(2){text-align:right}
     <div class="hdr-ico">🏫</div>
     <div>
       <div class="hdr-t" id="hTitle">نظام الرصد المدرسي الذكي</div>
-      <div class="hdr-s" id="hSub">مدرسة حمزة بن عبد المطلب الإعدادية للبنين &nbsp;|&nbsp; 2025 - 2026</div>
+      <div class="hdr-s" id="hSub">مدرسة حمزة بن عبد المطلب الإعدادية للبنين</div>
     </div>
   </div>
   <div class="hdr-badges">
@@ -1475,12 +1475,19 @@ function _injectHeaderHomeBtn(){
 // تحديث بيانات المدرسة في البوابة
 function updateGateway(){
   const s = DB && DB.settings ? DB.settings : {};
-  const sysEl = document.getElementById("gateSysName");
-  const schEl = document.getElementById("gateSchName");
+  const sysEl  = document.getElementById("gateSysName");
+  const schEl  = document.getElementById("gateSchName");
+  const hSubEl = document.getElementById("hSub");
   if(sysEl && s.sysName) sysEl.textContent = s.sysName;
-  if(schEl && (s.schName || s.year)){
-    schEl.innerHTML = (s.schName||"") + (s.year ? " &nbsp;|&nbsp; " + s.year : "");
+  // الواجهة الرئيسية — اسم المدرسة بدون سنة
+  if(schEl && s.schName) schEl.textContent = s.schName;
+  // الهيدر العلوي — اسم المدرسة + السنة من الإعدادات
+  if(hSubEl){
+    const _hn = s.schName || "مدرسة حمزة بن عبد المطلب الإعدادية للبنين";
+    hSubEl.innerHTML = _hn + (s.year ? " &nbsp;|&nbsp; " + s.year : "");
   }
+  // إطلاق حدث لتحديث أي عنصر آخر يعتمد على الإعدادات
+  document.dispatchEvent(new Event("settingsUpdated"));
 }
 
 // ===================== INJECT ADMIN EXTRAS =====================
@@ -2763,6 +2770,19 @@ function manualSave(){
 }
 
 window._manualSaveReady = function(){ manualSave(); };
+
+// تحديث hSub بالسنة من الإعدادات عند أي تغيير في DB.settings
+window._syncHSubYear = function(){
+  var s = (DB && DB.settings) ? DB.settings : {};
+  var el = document.getElementById("hSub");
+  if(!el) return;
+  var name = s.schName || "مدرسة حمزة بن عبد المطلب الإعدادية للبنين";
+  el.innerHTML = name + (s.year ? " &nbsp;|&nbsp; " + s.year : "");
+};
+// استدعاء بعد ثانيتين من التحميل (بعد أن تكتمل Firebase)
+setTimeout(function(){ window._syncHSubYear(); }, 2000);
+// استدعاء عند أي حدث تحديث إعدادات
+document.addEventListener("settingsUpdated", function(){ window._syncHSubYear(); });
 
 // ===== autoFill + TL/SL + selCls =====
 setTimeout(function(){
