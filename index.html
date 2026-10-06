@@ -2125,7 +2125,7 @@ window._clearAllRecDocs = async function(){
       _allItems = sec.items;
   });
   var _thItems = _allItems.map(function(it){ return "<th class='tbl-th-item'>" + it.name + "</th>"; }).join("");
-  var _tableHeader = "<tr class='tbl-hdr-row'><th class='tbl-th-sub'>المادة</th><th class='tbl-th-teacher'>المعلم</th>" + _thItems + "</tr>";
+  var _tableHeader = "<tr class='tbl-hdr-row'><th class='tbl-th-sub'>المادة</th><th class='tbl-th-teacher'>المعلم</th>" + _thItems + "<th class='tbl-th-note'>ملاحظات</th></tr>";
 
   // ترتيب: عادي ← PE ← إداري
   var _normalSecs = sections.filter(function(s){ return s.type!=="admin" && s.subject.indexOf("التربية البدنية")<0 && s.subject.indexOf("الرياضة")<0; });
@@ -2169,13 +2169,12 @@ window._clearAllRecDocs = async function(){
         var _gradeCell = ""; // حذف النسبة
     var _statusBadge = (sec.status && sec.status!=="حاضر" && sec.status!=="—")
       ? " <span class='status-badge'>" + sec.status + "</span>" : "";
-    var _noteInline = (sec.note && sec.note.trim())
-      ? "<div style='font-size:7.5px;color:#78350f;background:#fffbeb;border-radius:4px;padding:1px 5px;margin-top:2px;line-height:1.4;'>📝 " + sec.note.trim() + "</div>" : "";
+    var _noteCell = "<td class='tbl-td-note'>" + (sec.note && sec.note.trim() ? sec.note.trim() : "—") + "</td>";
     var rowClass = isAdmin ? "tbl-row admin-row" : (isEven ? "tbl-row even" : "tbl-row odd");
     return "<tr class='" + rowClass + "'>"
-      + "<td class='tbl-td-sub'>" + (isAdmin?"🛡":"📚") + " " + sec.subject + _statusBadge + _noteInline + "</td>"
+      + "<td class='tbl-td-sub'>" + (isAdmin?"🛡":"📚") + " " + sec.subject + _statusBadge + "</td>"
       + "<td class='tbl-td-teacher'>" + teacherNames + "</td>"
-      + _tdItems + _gradeCell + "</tr>";
+      + _tdItems + _gradeCell + _noteCell + "</tr>";
   }).join("");
 
   const noDataHTML = "<div style='text-align:center;padding:30px;color:#888;grid-column:1/-1'>"
@@ -2379,7 +2378,9 @@ function exportStudentPDF(){
     + '.status-badge{font-size:8px;background:#fee2e2;color:#991b1b;padding:1px 5px;border-radius:8px;margin-right:3px;}'
     + '.adm-item{display:inline-flex;align-items:center;gap:2px;margin-left:10px;font-size:8.5px;}'
     + '.adm-lbl{color:'+_C.muted+';font-size:8px;}'
-    + '.tbl-td-sub{vertical-align:top!important;}'
+    + '.tbl-th-note{width:65px;min-width:50px;max-width:65px;}'
+    + '.tbl-td-note{font-size:7.5px;color:#78350f;text-align:right;vertical-align:middle;padding:2px 3px;word-break:break-word;white-space:normal;}'
+    + '.tbl-td-sub{vertical-align:middle!important;}'
     + '.no-data{text-align:center;padding:20px;color:'+_C.muted+';font-size:10px;}'
     // التوقيعات
     + '.cert-sigs{'
@@ -2849,7 +2850,10 @@ window._highlightEmptyCells = function(isStaff){
       if(item.type!=="number" && item.type!=="select") return;
       var _v = _sd ? (_sd.scores||[])[idx] : undefined;
       if(_v===undefined||_v===null||_v===""){
-        var _rows = _tb.querySelectorAll("tr[data-sid='"+(_isS?'s':'t')+"_"+stu.id+"']");
+        // نبحث بـ data-sid أو بأي طريقة ممكنة
+        var _prefix = _isS?'s':'t';
+        var _rows = _tb.querySelectorAll("tr[data-sid='"+_prefix+"_"+stu.id+"']");
+        if(!_rows.length) _rows = _tb.querySelectorAll("tr[id='"+_prefix+"_"+stu.id+"']");
         if(_rows.length){
           var _allInputs = _rows[0].querySelectorAll(".sinp, td select");
           if(_allInputs[_numIdx]) _allInputs[_numIdx].style.cssText += ";border:2px solid #f87171!important;background:rgba(248,113,113,.12)!important;outline:2px solid #f87171!important;";
@@ -3343,7 +3347,9 @@ function _wrapForPrint(certHTML, name){
     '.status-badge{font-size:8px;background:#fee2e2;color:#991b1b;padding:1px 5px;border-radius:8px;}',
     '.adm-item{display:inline-flex;align-items:center;gap:3px;margin-left:8px;font-size:8.5px;}',
     '.adm-lbl{color:#6b7280;font-size:8px;}',
-    '.tbl-td-sub{vertical-align:top!important;}',
+    '.tbl-th-note{width:60px;min-width:45px;max-width:60px;}',
+    '.tbl-td-note{font-size:7px;color:#78350f;text-align:right;vertical-align:middle;padding:1px 2px;word-break:break-word;white-space:normal;line-height:1.3;}',
+    '.tbl-td-sub{vertical-align:middle!important;}',
     '.cert-sigs{display:flex;justify-content:space-between;align-items:center;padding-top:5px;margin-top:5px;border-top:1.5px dashed #6ee7b7;gap:4px;}',
     '.cert-sig{text-align:center;flex:1;}',
     '.cert-sig-title{font-size:9px;color:#6b7280;font-weight:700;}',
