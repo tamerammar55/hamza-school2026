@@ -2169,13 +2169,13 @@ window._clearAllRecDocs = async function(){
         var _gradeCell = ""; // حذف النسبة
     var _statusBadge = (sec.status && sec.status!=="حاضر" && sec.status!=="—")
       ? " <span class='status-badge'>" + sec.status + "</span>" : "";
-    var _noteRow = (sec.note && sec.note.trim())
-      ? "<tr class='note-row'><td colspan='" + (_allItems.length+3) + "' class='note-cell'>📝 " + sec.note.trim() + "</td></tr>" : "";
+    var _noteInline = (sec.note && sec.note.trim())
+      ? "<div style='font-size:7.5px;color:#78350f;background:#fffbeb;border-radius:4px;padding:1px 5px;margin-top:2px;line-height:1.4;'>📝 " + sec.note.trim() + "</div>" : "";
     var rowClass = isAdmin ? "tbl-row admin-row" : (isEven ? "tbl-row even" : "tbl-row odd");
     return "<tr class='" + rowClass + "'>"
-      + "<td class='tbl-td-sub'>" + (isAdmin?"🛡":"📚") + " " + sec.subject + _statusBadge + "</td>"
+      + "<td class='tbl-td-sub'>" + (isAdmin?"🛡":"📚") + " " + sec.subject + _statusBadge + _noteInline + "</td>"
       + "<td class='tbl-td-teacher'>" + teacherNames + "</td>"
-      + _tdItems + _gradeCell + "</tr>" + _noteRow;
+      + _tdItems + _gradeCell + "</tr>";
   }).join("");
 
   const noDataHTML = "<div style='text-align:center;padding:30px;color:#888;grid-column:1/-1'>"
@@ -2351,6 +2351,7 @@ function exportStudentPDF(){
     +   'font-weight:900;color:'+_C.primary+';font-size:9.5px;'
     +   'text-align:right!important;padding-right:7px!important;'
     +   'border-right:3px solid '+_C.primary+'!important;'
+    +   'vertical-align:top;'
     + '}'
     + '.tbl-td-sub.admin{color:'+_C.blue+';border-right:3px solid '+_C.blue+'!important;}'
     + '.tbl-td-sub.pe{color:'+_C.green+';border-right:3px solid #16a34a!important;}'
@@ -2378,7 +2379,7 @@ function exportStudentPDF(){
     + '.status-badge{font-size:8px;background:#fee2e2;color:#991b1b;padding:1px 5px;border-radius:8px;margin-right:3px;}'
     + '.adm-item{display:inline-flex;align-items:center;gap:2px;margin-left:10px;font-size:8.5px;}'
     + '.adm-lbl{color:'+_C.muted+';font-size:8px;}'
-    + '.note-row .note-cell{font-size:8px;color:#78350f;background:#fffbeb;padding:3px 8px;text-align:right;}'
+    + '.tbl-td-sub{vertical-align:top!important;}'
     + '.no-data{text-align:center;padding:20px;color:'+_C.muted+';font-size:10px;}'
     // التوقيعات
     + '.cert-sigs{'
@@ -3342,7 +3343,7 @@ function _wrapForPrint(certHTML, name){
     '.status-badge{font-size:8px;background:#fee2e2;color:#991b1b;padding:1px 5px;border-radius:8px;}',
     '.adm-item{display:inline-flex;align-items:center;gap:3px;margin-left:8px;font-size:8.5px;}',
     '.adm-lbl{color:#6b7280;font-size:8px;}',
-    '.note-row .note-cell{font-size:8px;color:#78350f;background:#fffbeb;padding:3px 8px;}',
+    '.tbl-td-sub{vertical-align:top!important;}',
     '.cert-sigs{display:flex;justify-content:space-between;align-items:center;padding-top:5px;margin-top:5px;border-top:1.5px dashed #6ee7b7;gap:4px;}',
     '.cert-sig{text-align:center;flex:1;}',
     '.cert-sig-title{font-size:9px;color:#6b7280;font-weight:700;}',
